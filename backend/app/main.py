@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import init_db
-from .routers import articles, insights, obsidian, settings as settings_router, sources
+from .routers import articles, insights, obsidian, settings as settings_router, sources, stats
 from .services.scheduler import scheduler_service
 
 logger = logging.getLogger(__name__)
@@ -70,3 +70,4 @@ app.include_router(sources.router)
 app.include_router(insights.router)
 app.include_router(settings_router.router)
 app.include_router(obsidian.router)
+app.include_router(stats.router)

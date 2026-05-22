@@ -3,11 +3,23 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+# 模型费用映射(元 / 1K tokens)，根据官方定价配置
+_COST_PER_1K: dict[str, float] = {
+    "qwen-plus": 0.004,
+    "qwen-turbo": 0.002,
+    "qwen-max": 0.02,
+    "deepseek-chat": 0.001,
+    "gpt-4o-mini": 0.01,
+    "gpt-4o": 0.05,
+}
 
 
 class LLMResponse(BaseModel):
@@ -46,6 +58,49 @@ class BaseLLM(ABC):
         """文本分类，返回 {category: confidence_score}。"""
         ...
 
+    async def _record_usage(
+        self, model: str, prompt_tokens: int, completion_tokens: int
+    ) -> None:
+        """记录 token 使用量到数据库（按天+模型累加）。"""
+        try:
+            from ...database import AsyncSessionLocal
+            from ...models import LLMUsage
+
+            total = prompt_tokens + completion_tokens
+            today = date.today().isoformat()
+            cost_rate = _COST_PER_1K.get(model, 0.004)
+            cost = total / 1000.0 * cost_rate
+
+            async with AsyncSessionLocal() as session:
+                from sqlalchemy import select
+
+                stmt = select(LLMUsage).where(
+                    LLMUsage.date == today, LLMUsage.model == model
+                )
+                result = await session.execute(stmt)
+                record = result.scalar_one_or_none()
+
+                if record:
+                    record.prompt_tokens += prompt_tokens
+                    record.completion_tokens += completion_tokens
+                    record.total_tokens += total
+                    record.request_count += 1
+                    record.cost_estimate += cost
+                else:
+                    record = LLMUsage(
+                        date=today,
+                        model=model,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total,
+                        request_count=1,
+                        cost_estimate=cost,
+                    )
+                    session.add(record)
+                await session.commit()
+        except Exception as exc:
+            logger.warning("Failed to record LLM usage: %s", exc)
+
 
 def get_llm_provider(provider: str | None = None) -> BaseLLM:
     """工厂函数，根据配置返回对应 LLM 实例。
@@ -74,5 +129,9 @@ def get_llm_provider(provider: str | None = None) -> BaseLLM:
             base_url=settings.OLLAMA_BASE_URL,
             model=settings.OLLAMA_MODEL,
         )
+    elif chosen == "dashscope":
+        from .dashscope import DashScopeLLM
+
+        return DashScopeLLM(api_key=settings.DASHSCOPE_API_KEY)
     else:
-        raise ValueError(f"不支持的 LLM provider: {chosen}，可选: deepseek, openai, ollama")
+        raise ValueError(f"不支持的 LLM provider: {chosen}，可选: deepseek, openai, ollama, dashscope")

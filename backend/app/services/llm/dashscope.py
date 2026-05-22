@@ -1,26 +1,30 @@
-"""Ollama (local LLM) adapter."""
+"""阿里百练(DashScope/通义千问) LLM adapter (OpenAI-compatible API)."""
 from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
-import httpx
+from openai import AsyncOpenAI
 
 from .base import BaseLLM, LLMResponse
 
 logger = logging.getLogger(__name__)
 
 
-class OllamaLLM(BaseLLM):
-    """Ollama 本地模型适配器 - 通过 HTTP API 调用本地 Ollama 服务。"""
+class DashScopeLLM(BaseLLM):
+    """阿里百练 DashScope API 适配器 - 使用 OpenAI 兼容接口。"""
 
     def __init__(
         self,
-        base_url: str = "http://localhost:11434",
-        model: str = "qwen2.5:7b",
+        api_key: str,
+        base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model: str = "qwen-plus",
     ) -> None:
-        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.base_url = base_url
         self.model = model
+        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     async def chat(
         self,
@@ -28,52 +32,33 @@ class OllamaLLM(BaseLLM):
         temperature: float = 0.7,
         max_tokens: int = 2000,
     ) -> LLMResponse:
-        """发送对话请求到 Ollama API。"""
+        """发送对话请求到 DashScope API。"""
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/api/chat",
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "stream": False,
-                        "options": {
-                            "temperature": temperature,
-                            "num_predict": max_tokens,
-                        },
-                    },
-                )
-                response.raise_for_status()
-                data = response.json()
-
-                content = data.get("message", {}).get("content", "")
-                # Ollama 返回的 token 统计
-                prompt_tokens = data.get("prompt_eval_count", 0)
-                completion_tokens = data.get("eval_count", 0)
-
-                resp = LLMResponse(
-                    content=content,
-                    model=data.get("model", self.model),
-                    usage={
-                        "prompt_tokens": prompt_tokens,
-                        "completion_tokens": completion_tokens,
-                        "total_tokens": prompt_tokens + completion_tokens,
-                    },
-                )
-                await self._record_usage(
-                    resp.model,
-                    prompt_tokens,
-                    completion_tokens,
-                )
-                return resp
-        except httpx.HTTPStatusError as e:
-            logger.error("Ollama API HTTP 错误: %s - %s", e.response.status_code, e.response.text[:200])
-            return LLMResponse(content="", model=self.model, usage={})
-        except httpx.ConnectError:
-            logger.error("无法连接 Ollama 服务 (%s)，请确认 Ollama 已启动", self.base_url)
-            return LLMResponse(content="", model=self.model, usage={})
+            response = await self._client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            choice = response.choices[0]
+            usage = response.usage
+            resp = LLMResponse(
+                content=choice.message.content or "",
+                model=response.model,
+                usage={
+                    "prompt_tokens": usage.prompt_tokens if usage else 0,
+                    "completion_tokens": usage.completion_tokens if usage else 0,
+                    "total_tokens": usage.total_tokens if usage else 0,
+                },
+            )
+            await self._record_usage(
+                resp.model,
+                resp.usage.get("prompt_tokens", 0),
+                resp.usage.get("completion_tokens", 0),
+            )
+            return resp
         except Exception as e:
-            logger.error("Ollama API 调用失败: %s", e)
+            logger.error("DashScope API 调用失败: %s", e)
             return LLMResponse(content="", model=self.model, usage={})
 
     async def summarize(self, text: str, max_length: int = 200) -> str:
@@ -140,7 +125,7 @@ class OllamaLLM(BaseLLM):
             if isinstance(result, list):
                 return [str(k).strip() for k in result if k]
         except (json.JSONDecodeError, ValueError):
-            logger.warning("关键词解析失败: %s", raw[:100])
+            logger.warning("关键词解析失败，尝试按行分割: %s", raw[:100])
             keywords = [k.strip().strip('"').strip("'") for k in raw.replace("\n", ",").split(",")]
             return [k for k in keywords if k and len(k) < 50][:10]
         return []

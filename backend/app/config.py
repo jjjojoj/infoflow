@@ -15,9 +15,10 @@ class Settings(BaseSettings):
     """Runtime settings loaded from .env / environment variables."""
 
     # LLM
-    LLM_PROVIDER: Literal["deepseek", "openai", "ollama"] = "deepseek"
+    LLM_PROVIDER: Literal["deepseek", "openai", "ollama", "dashscope"] = "dashscope"
     DEEPSEEK_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    DASHSCOPE_API_KEY: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:7b"
 

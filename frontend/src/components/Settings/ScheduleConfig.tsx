@@ -1,23 +1,63 @@
-import { useState } from 'react';
-import { Play, Pause, Clock, CheckCircle2, XCircle } from 'lucide-react';
-import type { FetchHistory } from '../../types';
-
-const MOCK_HISTORY: FetchHistory[] = [
-  { time: '2026-05-22 10:30:00', result: 'success', articles_count: 12 },
-  { time: '2026-05-22 09:00:00', result: 'success', articles_count: 8 },
-  { time: '2026-05-22 07:30:00', result: 'error', articles_count: 0 },
-  { time: '2026-05-22 06:00:00', result: 'success', articles_count: 15 },
-  { time: '2026-05-21 22:30:00', result: 'success', articles_count: 6 },
-];
+import { useState, useEffect } from 'react';
+import { Play, Pause, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { getSettings, updateSettings, getSources } from '../../services/api';
+import type { Settings, Source } from '../../types';
 
 export default function ScheduleConfig() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [interval, setInterval_] = useState(90);
   const [unit, setUnit] = useState<'minutes' | 'hours'>('minutes');
   const [mode, setMode] = useState<'continuous' | 'scheduled'>('continuous');
   const [startHour, setStartHour] = useState(8);
   const [endHour, setEndHour] = useState(22);
   const [running, setRunning] = useState(true);
-  const [history] = useState<FetchHistory[]>(MOCK_HISTORY);
+  const [sources, setSources] = useState<Source[]>([]);
+
+  // Load settings from backend
+  useEffect(() => {
+    async function load() {
+      try {
+        const [settingsRes, sourcesRes] = await Promise.all([
+          getSettings(),
+          getSources(),
+        ]);
+        const s = settingsRes.data;
+        setInterval_(s.fetch_interval || 90);
+        setMode(s.fetch_mode || 'continuous');
+        setStartHour(s.fetch_start_hour ?? 8);
+        setEndHour(s.fetch_end_hour ?? 22);
+        setRunning(s.scheduler_running ?? true);
+        if (s.fetch_interval && s.fetch_interval >= 60) {
+          setUnit('minutes');
+        }
+        const srcData = Array.isArray(sourcesRes.data) ? sourcesRes.data : ((sourcesRes.data as any)?.items ?? []);
+        setSources(srcData);
+      } catch {
+        // Use defaults if settings endpoint not available
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateSettings({
+        fetch_interval: interval,
+        fetch_mode: mode,
+        fetch_start_hour: startHour,
+        fetch_end_hour: endHour,
+        scheduler_running: running,
+      });
+    } catch (err) {
+      console.error('Failed to save schedule config:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const nextExecution = () => {
     const now = new Date();
@@ -25,6 +65,25 @@ export default function ScheduleConfig() {
     now.setMinutes(now.getMinutes() + mins);
     return now.toLocaleString('zh-CN');
   };
+
+  // Build recent history from sources' last_fetched
+  const fetchHistory = sources
+    .filter(s => s.last_fetched)
+    .sort((a, b) => new Date(b.last_fetched!).getTime() - new Date(a.last_fetched!).getTime())
+    .slice(0, 5)
+    .map(s => ({
+      time: new Date(s.last_fetched!).toLocaleString('zh-CN'),
+      result: s.status === 'error' ? 'error' as const : 'success' as const,
+      sourceName: s.name,
+    }));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-[#6366f1]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -119,32 +178,44 @@ export default function ScheduleConfig() {
         </div>
       </div>
 
-      {/* Recent history */}
+      {/* Recent fetch history (from real source data) */}
       <div className="rounded-xl border border-[#374151] bg-[var(--color-bg-surface)] p-5">
         <h3 className="mb-3 text-sm font-medium text-[var(--color-text-secondary)]">最近采集历史</h3>
-        <div className="space-y-2">
-          {history.map((h, i) => (
-            <div key={i} className="flex items-center justify-between rounded-lg bg-[var(--color-bg-elevated)] px-3 py-2">
-              <div className="flex items-center gap-2">
-                {h.result === 'success' ? (
-                  <CheckCircle2 className="h-4 w-4 text-[var(--color-success)]" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-[var(--color-danger)]" />
-                )}
-                <span className="text-sm text-[var(--color-text-primary)]">{h.time}</span>
+        {fetchHistory.length === 0 ? (
+          <p className="text-xs text-[var(--color-text-muted)]">暂无采集记录</p>
+        ) : (
+          <div className="space-y-2">
+            {fetchHistory.map((h, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg bg-[var(--color-bg-elevated)] px-3 py-2">
+                <div className="flex items-center gap-2">
+                  {h.result === 'success' ? (
+                    <CheckCircle2 className="h-4 w-4 text-[var(--color-success)]" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-[var(--color-danger)]" />
+                  )}
+                  <span className="text-sm text-[var(--color-text-primary)]">{h.time}</span>
+                  <span className="text-[10px] text-[var(--color-text-muted)]">({h.sourceName})</span>
+                </div>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {h.result === 'success' ? '采集成功' : '采集失败'}
+                </span>
               </div>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {h.result === 'success' ? `${h.articles_count} 篇文章` : '采集失败'}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Save */}
       <div className="flex justify-end gap-2">
         <button className="rounded-lg border border-[#374151] px-4 py-2 text-sm text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-elevated)]">取消</button>
-        <button className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--color-accent-light)]">保存配置</button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          保存配置
+        </button>
       </div>
     </div>
   );

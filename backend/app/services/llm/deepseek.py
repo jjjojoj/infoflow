@@ -42,7 +42,7 @@ class DeepSeekLLM(BaseLLM):
             )
             choice = response.choices[0]
             usage = response.usage
-            return LLMResponse(
+            resp = LLMResponse(
                 content=choice.message.content or "",
                 model=response.model,
                 usage={
@@ -51,6 +51,12 @@ class DeepSeekLLM(BaseLLM):
                     "total_tokens": usage.total_tokens if usage else 0,
                 },
             )
+            await self._record_usage(
+                resp.model,
+                resp.usage.get("prompt_tokens", 0),
+                resp.usage.get("completion_tokens", 0),
+            )
+            return resp
         except Exception as e:
             logger.error("DeepSeek API 调用失败: %s", e)
             return LLMResponse(content="", model=self.model, usage={})

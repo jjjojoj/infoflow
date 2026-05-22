@@ -51,11 +51,13 @@ class CrawlerService:
                 total_new += await self._run_builtin_scrapers(session)
             else:
                 for source in sources:
+                    # Cache name before any commit that could expire the object
+                    src_name = source.name
                     try:
                         new_count = await self._run_single_source(source, session)
                         total_new += new_count
                     except Exception as e:
-                        logger.error("Error running source '%s': %s", source.name, e)
+                        logger.error("Error running source '%s': %s", src_name, e)
                         continue
 
         logger.info("CrawlerService: full crawl complete. %d new articles.", total_new)
@@ -76,36 +78,42 @@ class CrawlerService:
 
     async def _run_single_source(self, source: Source, session: Any) -> int:
         """Execute a single source's scraper or RSS parser."""
-        logger.info("Running source: %s (type=%s)", source.name, source.source_type)
+        # Cache attributes before any commit can expire the ORM object
+        source_id = source.id
+        source_name = source.name
+        source_type = source.source_type
+        source_url = source.url
+
+        logger.info("Running source: %s (type=%s)", source_name, source_type)
 
         articles: list[dict[str, Any]] = []
 
-        if source.source_type == "rss":
-            articles = await rss_parser.parse(source.url)
-        elif source.source_type == "crawler":
-            scraper_cls = _SCRAPER_MAP.get(source.name)
+        if source_type == "rss":
+            articles = await rss_parser.parse(source_url)
+        elif source_type == "crawler":
+            scraper_cls = _SCRAPER_MAP.get(source_name)
             if scraper_cls:
                 scraper = scraper_cls()
                 articles = await scraper.fetch()
             else:
-                logger.warning("No scraper registered for source name '%s'", source.name)
+                logger.warning("No scraper registered for source name '%s'", source_name)
                 return 0
         else:
-            logger.warning("Unknown source_type '%s' for source '%s'", source.source_type, source.name)
+            logger.warning("Unknown source_type '%s' for source '%s'", source_type, source_name)
             return 0
 
         # Deduplicate and store
         new_count = await self._store_articles(articles, session)
 
-        # Update last_fetched timestamp
+        # Update last_fetched timestamp using cached id
         await session.execute(
             update(Source)
-            .where(Source.id == source.id)
+            .where(Source.id == source_id)
             .values(last_fetched=datetime.utcnow())
         )
         await session.commit()
 
-        logger.info("Source '%s': %d new articles stored", source.name, new_count)
+        logger.info("Source '%s': %d new articles stored", source_name, new_count)
         return new_count
 
     async def _run_builtin_scrapers(self, session: Any) -> int:

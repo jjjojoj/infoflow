@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Article, Source, Insight, GraphData, Settings, Paginated, CreateSourceData, Interest, CreateInterestData, ObsidianStatus } from '../types';
+import type { Article, Source, Insight, GraphData, Settings, Paginated, CreateSourceData, Interest, CreateInterestData, ObsidianStatus, DashboardStats } from '../types';
 
 // In dev, Vite proxies /api → http://localhost:8000.
 // In Docker, nginx proxies /api → backend:8000.
@@ -17,6 +17,10 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+// Dashboard
+export const getDashboardStats = () =>
+  api.get<DashboardStats>('/settings/dashboard');
 
 // Articles
 export const getArticles = (params?: { skip?: number; limit?: number; is_bookmarked?: boolean; is_read?: boolean }) =>
@@ -87,5 +91,19 @@ export const updateMOCs = () =>
 // LLM
 export const testLLMConnection = () =>
   api.post('/settings/test-llm');
+
+// 自然语言生成兴趣点
+export const generateInterestsFromDescription = (description: string) =>
+  api.post('/settings/interests/generate-from-description', { description });
+
+// Token 用量统计
+export const getTokenUsage = (days?: number) =>
+  api.get('/stats/token-usage', { params: { days } });
+
+export const getUsageSummary = () =>
+  api.get('/stats/token-usage/summary');
+
+export const getUsageByModel = () =>
+  api.get('/stats/token-usage/by-model');
 
 export default api;

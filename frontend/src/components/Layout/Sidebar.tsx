@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Home,
@@ -6,7 +7,10 @@ import {
   Bookmark,
   Settings as SettingsIcon,
   Plus,
+  Loader2,
 } from 'lucide-react';
+import { getArticles } from '../../services/api';
+import type { Article } from '../../types';
 
 const navItems = [
   { to: '/', label: '首页', icon: Home },
@@ -16,15 +20,45 @@ const navItems = [
   { to: '/settings', label: '设置', icon: SettingsIcon },
 ];
 
-const historyInsights = [
-  { id: 1, title: 'OpenAI 发布 GPT-4o...', time: '2 小时前', color: '#6366f1' },
-  { id: 2, title: 'AI 监管趋严：全球动向', time: '昨天', color: '#10b981' },
-  { id: 3, title: '特斯拉 FSD V12 升级', time: '2 天前', color: '#6366f1' },
-  { id: 4, title: 'WWDC24 核心发布汇总', time: '3 天前', color: '#f59e0b' },
-  { id: 5, title: 'AI 应用落地场景加速', time: '5 天前', color: '#ef4444' },
-];
+const sourceTypeColors: Record<string, string> = {
+  arxiv: '#6366f1',
+  github: '#818cf8',
+  zhihu: '#f59e0b',
+  huawei_ascend: '#10b981',
+  rss: '#ec4899',
+};
+
+function timeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins} 分钟前`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} 小时前`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} 天前`;
+  return date.toLocaleDateString('zh-CN');
+}
 
 export default function Sidebar() {
+  const [recentArticles, setRecentArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchRecent() {
+      try {
+        const res = await getArticles({ limit: 5 });
+        setRecentArticles(res.data.items ?? []);
+      } catch {
+        setRecentArticles([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchRecent();
+  }, []);
+
   return (
     <aside className="flex h-full w-60 shrink-0 flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
       {/* Logo */}
@@ -72,29 +106,43 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* History Insights */}
+      {/* Recent Articles (replaces mock historyInsights) */}
       <div className="border-t border-[var(--color-border-subtle)] px-4 py-4">
-        <h3 className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">历史洞察</h3>
-        <div className="space-y-2">
-          {historyInsights.map((item) => (
-            <div
-              key={item.id}
-              className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-[var(--color-bg-elevated)]"
-            >
-              <span
-                className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: item.color }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="truncate text-[var(--color-text-primary)]">{item.title}</div>
-                <div className="text-[var(--color-text-muted)]">{item.time}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button className="mt-3 flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]">
-          查看全部 <span className="text-xs">›</span>
-        </button>
+        <h3 className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">最近文章</h3>
+        {loading ? (
+          <div className="flex items-center justify-center py-2">
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--color-text-muted)]" />
+          </div>
+        ) : recentArticles.length === 0 ? (
+          <p className="text-[10px] text-[var(--color-text-muted)]">暂无文章</p>
+        ) : (
+          <div className="space-y-2">
+            {recentArticles.map((article) => (
+              <NavLink
+                key={article.id}
+                to={`/articles/${article.id}`}
+                className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-[var(--color-bg-elevated)]"
+              >
+                <span
+                  className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: sourceTypeColors[article.source_type || ''] || '#6366f1' }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="truncate text-[var(--color-text-primary)]">{article.title}</div>
+                  <div className="text-[var(--color-text-muted)]">{timeAgo(article.created_at)}</div>
+                </div>
+              </NavLink>
+            ))}
+          </div>
+        )}
+        {recentArticles.length > 0 && (
+          <NavLink
+            to="/insights"
+            className="mt-3 flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+          >
+            查看全部 <span className="text-xs">›</span>
+          </NavLink>
+        )}
       </div>
     </aside>
   );

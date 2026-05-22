@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Rss, Star, Bot, Clock, BookOpen, Settings2 } from 'lucide-react';
+import { Rss, Star, Bot, Clock, BookOpen, Settings2, BarChart3 } from 'lucide-react';
 import SourceManager from './SourceManager';
 import InterestConfig from './InterestConfig';
 import LLMConfig from './LLMConfig';
 import ScheduleConfig from './ScheduleConfig';
 import ObsidianConfig from './ObsidianConfig';
 import GeneralConfig from './GeneralConfig';
+import TokenUsage from './TokenUsage';
 
 const TABS = [
   { key: 'sources', label: '信息源管理', icon: Rss },
@@ -13,6 +14,7 @@ const TABS = [
   { key: 'llm', label: 'LLM设置', icon: Bot },
   { key: 'schedule', label: '采集设置', icon: Clock },
   { key: 'obsidian', label: 'Obsidian配置', icon: BookOpen },
+  { key: 'usage', label: '用量统计', icon: BarChart3 },
   { key: 'general', label: '通用设置', icon: Settings2 },
 ] as const;
 
@@ -28,6 +30,7 @@ export default function Settings() {
       case 'llm': return <LLMConfig />;
       case 'schedule': return <ScheduleConfig />;
       case 'obsidian': return <ObsidianConfig />;
+      case 'usage': return <TokenUsage />;
       case 'general': return <GeneralConfig />;
     }
   };

@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Wifi, WifiOff, Loader2, Eye, EyeOff } from 'lucide-react';
 
-type LLMProvider = 'deepseek' | 'openai' | 'ollama';
+type LLMProvider = 'deepseek' | 'openai' | 'ollama' | 'dashscope';
 
 interface LLMFormState {
   provider: LLMProvider;
   deepseek_api_key: string;
   openai_api_key: string;
   openai_model: string;
+  dashscope_api_key: string;
   ollama_base_url: string;
   ollama_model: string;
   temperature: number;
@@ -16,10 +17,11 @@ interface LLMFormState {
 
 export default function LLMConfig() {
   const [form, setForm] = useState<LLMFormState>({
-    provider: 'deepseek',
-    deepseek_api_key: 'sk-*********************',
+    provider: 'dashscope',
+    deepseek_api_key: '',
     openai_api_key: '',
     openai_model: 'gpt-4o-mini',
+    dashscope_api_key: 'sk-*********************',
     ollama_base_url: 'http://localhost:11434',
     ollama_model: 'qwen2.5:7b',
     temperature: 0.7,
@@ -40,6 +42,7 @@ export default function LLMConfig() {
   };
 
   const providers: { key: LLMProvider; label: string; desc: string }[] = [
+    { key: 'dashscope', label: '阿里百练(DashScope)', desc: '通义千问系列，高性价比' },
     { key: 'deepseek', label: 'DeepSeek', desc: '高性价比国产大模型' },
     { key: 'openai', label: 'OpenAI', desc: 'GPT-4o 系列' },
     { key: 'ollama', label: 'Ollama (本地)', desc: '本地部署，无需 API Key' },
@@ -50,7 +53,7 @@ export default function LLMConfig() {
       <h2 className="text-lg font-medium">LLM 模型配置</h2>
 
       {/* Provider selection */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         {providers.map(p => (
           <button
             key={p.key}
@@ -65,6 +68,25 @@ export default function LLMConfig() {
 
       {/* Provider-specific config */}
       <div className="rounded-xl border border-[#374151] bg-[var(--color-bg-surface)] p-5 space-y-4">
+        {form.provider === 'dashscope' && (
+          <div>
+            <label className="mb-1.5 block text-sm text-[var(--color-text-secondary)]">DashScope API Key</label>
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={form.dashscope_api_key}
+                onChange={e => setForm(f => ({ ...f, dashscope_api_key: e.target.value }))}
+                className="w-full rounded-lg border border-[#374151] bg-[#1e2d3d] px-3 py-2 pr-10 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-accent)]"
+                placeholder="sk-..."
+              />
+              <button onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]">
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">默认使用 qwen-plus 模型，性价比最优</p>
+          </div>
+        )}
+
         {form.provider === 'deepseek' && (
           <div>
             <label className="mb-1.5 block text-sm text-[var(--color-text-secondary)]">DeepSeek API Key</label>

@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { FolderOpen, Download, RefreshCw, CheckCircle2, Loader2, FileText } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FolderOpen, Download, RefreshCw, CheckCircle2, XCircle, Loader2, FileText } from 'lucide-react';
+import { getObsidianStatus, triggerExport, updateMOCs } from '../../services/api';
+import type { ObsidianStatus } from '../../types';
 
 export default function ObsidianConfig() {
-  const [vaultPath, setVaultPath] = useState('D:\\ObsidianVault\\InfoFlow');
-  const [autoExport, setAutoExport] = useState(true);
+  const [vaultPath, setVaultPath] = useState('');
+  const [autoExport, setAutoExport] = useState(false);
   const [exportInterval, setExportInterval] = useState(60);
   const [exportMode, setExportMode] = useState<'full' | 'incremental'>('incremental');
   const [categories, setCategories] = useState({
@@ -14,21 +16,46 @@ export default function ObsidianConfig() {
   });
   const [exporting, setExporting] = useState(false);
   const [updatingMOC, setUpdatingMOC] = useState(false);
+  const [status, setStatus] = useState<ObsidianStatus | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const mockStatus = {
-    connected: true,
-    file_count: 234,
-    last_export: '2026-05-22 09:45:00',
-  };
+  useEffect(() => {
+    async function loadStatus() {
+      try {
+        const res = await getObsidianStatus();
+        setStatus(res.data);
+      } catch {
+        setStatus(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStatus();
+  }, []);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setExporting(true);
-    setTimeout(() => setExporting(false), 2000);
+    try {
+      await triggerExport(exportMode);
+      // Refresh status after export
+      const res = await getObsidianStatus();
+      setStatus(res.data);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const handleUpdateMOC = () => {
+  const handleUpdateMOC = async () => {
     setUpdatingMOC(true);
-    setTimeout(() => setUpdatingMOC(false), 1500);
+    try {
+      await updateMOCs();
+    } catch (err) {
+      console.error('Update MOC failed:', err);
+    } finally {
+      setUpdatingMOC(false);
+    }
   };
 
   return (
@@ -52,22 +79,41 @@ export default function ObsidianConfig() {
       {/* Vault status */}
       <div className="rounded-xl border border-[#374151] bg-[var(--color-bg-surface)] p-5">
         <h3 className="mb-3 text-sm font-medium text-[var(--color-text-secondary)]">Vault 状态</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3 text-center">
-            <div className="flex items-center justify-center gap-1.5 text-[var(--color-success)]">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="text-xs font-medium">已连接</span>
+        {loading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--color-accent)]" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3 text-center">
+              {status?.connected ? (
+                <div className="flex items-center justify-center gap-1.5 text-[var(--color-success)]">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="text-xs font-medium">已连接</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-1.5 text-[var(--color-text-muted)]">
+                  <XCircle className="h-4 w-4" />
+                  <span className="text-xs font-medium">未连接</span>
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3 text-center">
+              <div className="text-lg font-semibold text-[var(--color-text-primary)]">
+                {status?.file_count ?? 0}
+              </div>
+              <div className="text-xs text-[var(--color-text-muted)]">文件数</div>
+            </div>
+            <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3 text-center">
+              <div className="text-xs text-[var(--color-text-primary)]">
+                {status?.last_export
+                  ? new Date(status.last_export).toLocaleString('zh-CN')
+                  : '从未导出'}
+              </div>
+              <div className="text-xs text-[var(--color-text-muted)]">最近导出</div>
             </div>
           </div>
-          <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3 text-center">
-            <div className="text-lg font-semibold text-[var(--color-text-primary)]">{mockStatus.file_count}</div>
-            <div className="text-xs text-[var(--color-text-muted)]">文件数</div>
-          </div>
-          <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3 text-center">
-            <div className="text-xs text-[var(--color-text-primary)]">{mockStatus.last_export}</div>
-            <div className="text-xs text-[var(--color-text-muted)]">最近导出</div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Auto export toggle */}

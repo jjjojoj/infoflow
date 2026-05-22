@@ -1,14 +1,8 @@
-import { useState } from 'react';
-import { Check, Trash2, Filter } from 'lucide-react';
-
-interface BookmarkedArticle {
-  id: number;
-  title: string;
-  source_name: string;
-  tags: string[];
-  created_at: string;
-  is_read: boolean;
-}
+import { useEffect, useState } from 'react';
+import { Check, Trash2, Filter, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { getArticles, bookmarkArticle, markRead } from '../../services/api';
+import type { Article } from '../../types';
 
 const tagColors: Record<string, string> = {
   '技术突破': '#6366f1',
@@ -18,68 +12,63 @@ const tagColors: Record<string, string> = {
   '监管政策': '#ef4444',
 };
 
-const mockBookmarked: BookmarkedArticle[] = [
-  {
-    id: 1,
-    title: 'OpenAI 发布 GPT-4o：多模态能力再突破',
-    source_name: 'The Verge',
-    tags: ['技术突破'],
-    created_at: '2 小时前',
-    is_read: false,
-  },
-  {
-    id: 2,
-    title: 'AI 监管趋严：欧盟 AI 法案正式生效',
-    source_name: 'Reuters',
-    tags: ['监管政策'],
-    created_at: '4 小时前',
-    is_read: false,
-  },
-  {
-    id: 3,
-    title: '特斯拉 FSD V12 升级：端到端神经网络驾驶',
-    source_name: 'TechCrunch',
-    tags: ['技术突破', '市场反应'],
-    created_at: '昨天',
-    is_read: true,
-  },
-  {
-    id: 4,
-    title: 'WWDC24 核心发布汇总：Apple Intelligence 全面铺开',
-    source_name: 'Apple Newsroom',
-    tags: ['产品影响'],
-    created_at: '2 天前',
-    is_read: true,
-  },
-  {
-    id: 5,
-    title: 'Anthropic Claude 3.5 Sonnet：对比评测',
-    source_name: 'Anthropic Blog',
-    tags: ['技术突破'],
-    created_at: '3 天前',
-    is_read: false,
-  },
-];
-
-const allTags = ['全部', '技术突破', '产品影响', '市场反应', '行业影响', '监管政策'];
-
 export default function ReadLater() {
-  const [articles, setArticles] = useState(mockBookmarked);
+  const navigate = useNavigate();
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filterTag, setFilterTag] = useState('全部');
+
+  useEffect(() => {
+    async function fetchBookmarked() {
+      try {
+        const res = await getArticles({ is_bookmarked: true, limit: 100 });
+        setArticles(res.data.items ?? []);
+      } catch (err) {
+        console.error('Failed to fetch bookmarked articles:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchBookmarked();
+  }, []);
+
+  // Build tag list from actual data
+  const allTags = ['全部', ...Array.from(new Set(articles.flatMap((a) => a.tags ?? [])))];
 
   const filteredArticles = filterTag === '全部'
     ? articles
-    : articles.filter((a) => a.tags.includes(filterTag));
+    : articles.filter((a) => (a.tags ?? []).includes(filterTag));
 
-  const toggleRead = (id: number) => {
-    setArticles((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, is_read: !a.is_read } : a))
+  const toggleRead = async (article: Article) => {
+    try {
+      const res = await markRead(article.id);
+      setArticles((prev) =>
+        prev.map((a) => (a.id === article.id ? res.data : a))
+      );
+    } catch (e) {
+      console.error('Failed to toggle read:', e);
+    }
+  };
+
+  const removeArticle = async (article: Article) => {
+    try {
+      const res = await bookmarkArticle(article.id);
+      // If it was bookmarked, un-bookmark removes it from the list
+      if (!res.data.is_bookmarked) {
+        setArticles((prev) => prev.filter((a) => a.id !== article.id));
+      }
+    } catch (e) {
+      console.error('Failed to remove bookmark:', e);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-accent)]" />
+      </div>
     );
-  };
-
-  const removeArticle = (id: number) => {
-    setArticles((prev) => prev.filter((a) => a.id !== id));
-  };
+  }
 
   return (
     <section className="p-6 space-y-6">
@@ -116,7 +105,8 @@ export default function ReadLater() {
         {filteredArticles.map((article) => (
           <div
             key={article.id}
-            className="flex items-center gap-4 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 transition-colors hover:border-[var(--color-accent)]/30"
+            onClick={() => navigate(`/articles/${article.id}`)}
+            className="flex items-center gap-4 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-4 transition-colors hover:border-[var(--color-accent)]/30 cursor-pointer"
           >
             {/* Content */}
             <div className="flex-1 min-w-0">
@@ -124,10 +114,12 @@ export default function ReadLater() {
                 {article.title}
               </h3>
               <div className="mt-1.5 flex items-center gap-2">
-                <span className="text-xs text-[var(--color-text-muted)]">{article.source_name}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">{article.source_name || '未知'}</span>
                 <span className="text-xs text-[var(--color-text-muted)]">·</span>
-                <span className="text-xs text-[var(--color-text-muted)]">{article.created_at}</span>
-                {article.tags.map((tag) => (
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {new Date(article.created_at).toLocaleDateString('zh-CN')}
+                </span>
+                {(article.tags ?? []).map((tag) => (
                   <span
                     key={tag}
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
@@ -146,7 +138,7 @@ export default function ReadLater() {
             {/* Actions */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => toggleRead(article.id)}
+                onClick={(e) => { e.stopPropagation(); toggleRead(article); }}
                 className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
                   article.is_read
                     ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
@@ -157,7 +149,7 @@ export default function ReadLater() {
                 <Check size={16} />
               </button>
               <button
-                onClick={() => removeArticle(article.id)}
+                onClick={(e) => { e.stopPropagation(); removeArticle(article); }}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)] transition-colors"
                 title="移除"
               >

@@ -95,3 +95,21 @@ class Insight(Base):
     )
 
     article: Mapped["Article"] = relationship("Article", back_populates="insights")
+
+
+class LLMUsage(Base):
+    """Token usage tracking for LLM calls."""
+
+    __tablename__ = "llm_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    date: Mapped[str] = mapped_column(String(16), nullable=False, index=True)  # 2026-05-22
+    model: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cost_estimate: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
