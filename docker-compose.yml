@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_data:/app/data
+      - obsidian_vault:/app/data/obsidian_vault
+    env_file:
+      - .env
+    networks:
+      - infoflow
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - infoflow
+    restart: unless-stopped
+
+volumes:
+  backend_data:
+  obsidian_vault:
+
+networks:
+  infoflow:
+    driver: bridge

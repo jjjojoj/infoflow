@@ -1,0 +1,136 @@
+"""OpenAI LLM adapter."""
+from __future__ import annotations
+
+import json
+import logging
+
+from openai import AsyncOpenAI
+
+from .base import BaseLLM, LLMResponse
+
+logger = logging.getLogger(__name__)
+
+
+class OpenAILLM(BaseLLM):
+    """OpenAI API 适配器。"""
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-4o-mini",
+    ) -> None:
+        self.api_key = api_key
+        self.model = model
+        self._client = AsyncOpenAI(api_key=api_key)
+
+    async def chat(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+    ) -> LLMResponse:
+        """发送对话请求到 OpenAI API。"""
+        try:
+            response = await self._client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            choice = response.choices[0]
+            usage = response.usage
+            return LLMResponse(
+                content=choice.message.content or "",
+                model=response.model,
+                usage={
+                    "prompt_tokens": usage.prompt_tokens if usage else 0,
+                    "completion_tokens": usage.completion_tokens if usage else 0,
+                    "total_tokens": usage.total_tokens if usage else 0,
+                },
+            )
+        except Exception as e:
+            logger.error("OpenAI API 调用失败: %s", e)
+            return LLMResponse(content="", model=self.model, usage={})
+
+    async def summarize(self, text: str, max_length: int = 200) -> str:
+        """生成文本摘要。"""
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一个专业的文本摘要助手，擅长提取核心要点并生成简洁的摘要。",
+            },
+            {
+                "role": "user",
+                "content": f"请用不超过{max_length}字总结以下内容的核心要点，直接给出摘要内容：\n\n{text}",
+            },
+        ]
+        resp = await self.chat(messages, temperature=0.3, max_tokens=500)
+        return resp.content.strip()
+
+    async def extract_keywords(self, text: str, max_keywords: int = 10) -> list[str]:
+        """提取关键词。"""
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一个关键词提取助手，请以JSON数组格式返回关键词。",
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"从以下文本中提取最多{max_keywords}个关键词，"
+                    f"以JSON数组格式返回（如 [\"关键词1\", \"关键词2\"]），不要包含其他文字：\n\n{text}"
+                ),
+            },
+        ]
+        resp = await self.chat(messages, temperature=0.2, max_tokens=300)
+        return self._parse_keywords(resp.content)
+
+    async def classify(self, text: str, categories: list[str]) -> dict:
+        """文本分类。"""
+        categories_str = ", ".join(categories)
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一个文本分类助手，请以JSON格式返回分类结果。",
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"将以下文本分类到这些类别中: [{categories_str}]。\n"
+                    f"返回JSON格式，键为类别名，值为置信度(0-1)，如 {{\"类别A\": 0.8, \"类别B\": 0.2}}。"
+                    f"只返回JSON，不要包含其他文字：\n\n{text}"
+                ),
+            },
+        ]
+        resp = await self.chat(messages, temperature=0.2, max_tokens=300)
+        return self._parse_classification(resp.content, categories)
+
+    @staticmethod
+    def _parse_keywords(raw: str) -> list[str]:
+        """解析 LLM 返回的关键词 JSON。"""
+        try:
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            result = json.loads(cleaned)
+            if isinstance(result, list):
+                return [str(k).strip() for k in result if k]
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("关键词解析失败: %s", raw[:100])
+            keywords = [k.strip().strip('"').strip("'") for k in raw.replace("\n", ",").split(",")]
+            return [k for k in keywords if k and len(k) < 50][:10]
+        return []
+
+    @staticmethod
+    def _parse_classification(raw: str, categories: list[str]) -> dict:
+        """解析 LLM 返回的分类 JSON。"""
+        try:
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            result = json.loads(cleaned)
+            if isinstance(result, dict):
+                return {k: float(v) for k, v in result.items() if k in categories}
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("分类结果解析失败: %s", raw[:100])
+        return {cat: 1.0 / len(categories) for cat in categories} if categories else {}
