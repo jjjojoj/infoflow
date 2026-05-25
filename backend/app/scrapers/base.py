@@ -29,10 +29,14 @@ BROAD_KEYWORDS = [
     # CV
     "计算机视觉", "computer vision", "目标检测", "object detection",
     "图像分割", "segmentation", "多模态", "multimodal",
-    # 通用AI
+    # 通用AI / 工程化
     "PyTorch", "pytorch", "transformer", "量化", "quantiz",
     "蒸馏", "distill", "RAG", "agent", "微调", "fine-tun",
     "向量数据库", "vector database", "embedding",
+    # 部署/推理/加速相关
+    "ONNX", "onnx", "加速", "accelerat", "推理", "inference",
+    "训练", "training", "文档解析", "document pars",
+    "硬件加速", "hardware", "FSDP", "分布式",
 ]
 
 # Combined list (for backward compat)

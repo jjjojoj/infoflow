@@ -2,11 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for scrapling/lxml
+# System deps for scrapling/lxml + camoufox GTK3
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         curl \
+        libgtk-3-0 \
+        libdbus-glib-1-2 \
+        libxt6 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/requirements.txt
