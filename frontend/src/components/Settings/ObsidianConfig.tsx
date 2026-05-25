@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { FolderOpen, Download, RefreshCw, CheckCircle2, XCircle, Loader2, FileText, Save } from 'lucide-react';
+import { FolderOpen, Download, RefreshCw, CheckCircle2, XCircle, Loader2, ExternalLink, Save } from 'lucide-react';
 import { getObsidianStatus, triggerExport, updateMOCs, updateSettings } from '../../services/api';
 import type { ObsidianStatus } from '../../types';
 
 export default function ObsidianConfig() {
-  const [vaultPath, setVaultPath] = useState('');
   const [autoExport, setAutoExport] = useState(false);
   const [exportInterval, setExportInterval] = useState(60);
   const [exportMode, setExportMode] = useState<'full' | 'incremental'>('incremental');
@@ -21,9 +20,6 @@ export default function ObsidianConfig() {
       try {
         const res = await getObsidianStatus();
         setStatus(res.data);
-        if (res.data?.vault_path) {
-          setVaultPath(res.data.vault_path);
-        }
       } catch {
         setStatus(null);
       } finally {
@@ -37,13 +33,8 @@ export default function ObsidianConfig() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await updateSettings({
-        obsidian_vault_path: vaultPath,
-        auto_export: autoExport,
-        export_interval: exportInterval,
-      } as any);
+      await updateSettings({ auto_export: autoExport, export_interval: exportInterval } as any);
       setSaveMsg('已保存');
-      // refresh status
       const res = await getObsidianStatus();
       setStatus(res.data);
     } catch {
@@ -60,7 +51,6 @@ export default function ObsidianConfig() {
       const res = await triggerExport(exportMode);
       const data = res.data;
       setExportMsg(`成功导出 ${data.exported_count} 篇${data.skipped_count ? `，跳过 ${data.skipped_count} 篇` : ''}`);
-      // Refresh status after export
       const statusRes = await getObsidianStatus();
       setStatus(statusRes.data);
     } catch (err) {
@@ -82,6 +72,59 @@ export default function ObsidianConfig() {
     }
   };
 
+  const handleSelectFolder = async () => {
+    // File System Access API — 仅 Chromium 浏览器支持
+    try {
+      if ('showDirectoryPicker' in window) {
+        const dirHandle = await (window as any).showDirectoryPicker({ mode: 'read' });
+        // showDirectoryPicker 只返回 name（文件夹名），不返回完整路径
+        // 所以作为提示展示给用户，让用户手动确认完整路径
+        const folderName = dirHandle.name;
+        const userInput = prompt(
+          `浏览器安全限制无法获取完整路径。\n\n` +
+          `你选择的文件夹名: ${folderName}\n\n` +
+          `请输入完整的 Obsidian Vault 路径\n` +
+          `（例如 D:\\工作知识库\\信息助手Vault）:`,
+          `D:\\${folderName}`
+        );
+        if (userInput) {
+          await updateSettings({ obsidian_vault_path: userInput } as any);
+          setSaveMsg('路径已更新，重启后端生效');
+        }
+      } else {
+        // Fallback: 用旧式 input 目录选择
+        const input = document.createElement('input');
+        input.type = 'file';
+        // @ts-ignore webkitdirectory 是非标准属性
+        input.webkitdirectory = true;
+        input.onchange = () => {
+          const files = input.files;
+          if (files && files.length > 0) {
+            const relativePath = files[0].webkitRelativePath;
+            const rootDir = relativePath.split('/')[0];
+            const userInput = prompt(
+              `浏览器安全限制无法获取完整路径。\n\n` +
+              `你选择的文件夹名: ${rootDir}\n\n` +
+              `请输入完整的 Obsidian Vault 路径\n` +
+              `（例如 D:\\工作知识库\\信息助手Vault）:`,
+              `D:\\${rootDir}`
+            );
+            if (userInput) {
+              updateSettings({ obsidian_vault_path: userInput } as any);
+              setSaveMsg('路径已更新，重启后端生效');
+            }
+          }
+        };
+        input.click();
+      }
+    } catch (err) {
+      // 用户取消选择
+      console.log('Folder selection cancelled or failed:', err);
+    }
+  };
+
+  const hostPath = status?.host_path || '';
+
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-medium">Obsidian 配置</h2>
@@ -89,15 +132,38 @@ export default function ObsidianConfig() {
       {/* Vault path */}
       <div className="rounded-xl border border-[#374151] bg-[var(--color-bg-surface)] p-5 space-y-4">
         <h3 className="text-sm font-medium text-[var(--color-text-secondary)]">Vault 路径</h3>
-        <div className="flex items-center gap-2">
-          <FolderOpen className="h-4 w-4 text-[var(--color-text-muted)]" />
-          <input
-            value={vaultPath}
-            onChange={e => setVaultPath(e.target.value)}
-            className="flex-1 rounded-lg border border-[#374151] bg-[#1e2d3d] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-accent)]"
-            placeholder="/app/data/obsidian_vault"
-          />
+
+        {/* Obsidian 打开路径（Windows/宿主机） */}
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--color-text-muted)]">
+            Obsidian 打开路径（本机路径）
+          </label>
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
+            <div className="flex-1 rounded-lg border border-[#374151] bg-[#1e2d3d] px-3 py-2 text-sm text-[var(--color-text-primary)]">
+              {hostPath || '未配置'}
+            </div>
+            <button
+              onClick={handleSelectFolder}
+              className="shrink-0 rounded-lg border border-[#374151] bg-[var(--color-bg-elevated)] px-3 py-2 text-xs font-medium text-[var(--color-text-primary)] transition hover:bg-[#2a3f52]"
+            >
+              浏览...
+            </button>
+          </div>
+          {hostPath && (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              在 Obsidian 中「打开库」时选择此路径
+            </p>
+          )}
         </div>
+
+        {/* Docker 内路径（只读参考） */}
+        {status?.vault_path && (
+          <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3">
+            <span className="text-xs text-[var(--color-text-muted)]">容器内路径: </span>
+            <code className="text-xs text-[var(--color-text-secondary)]">{status.vault_path}</code>
+          </div>
+        )}
       </div>
 
       {/* Vault status */}
@@ -155,6 +221,16 @@ export default function ObsidianConfig() {
                     </span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Open in Obsidian hint */}
+            {hostPath && (
+              <div className="mt-4 flex items-center gap-2 rounded-lg bg-[var(--color-accent-soft)] p-3">
+                <ExternalLink className="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
+                <span className="text-xs text-[var(--color-text-primary)]">
+                  用 Obsidian 打开: <code className="font-mono">{hostPath}</code>
+                </span>
               </div>
             )}
           </>
@@ -246,7 +322,7 @@ export default function ObsidianConfig() {
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           保存配置
         </button>
-        {saveMsg && <span className={`text-xs ${saveMsg === '已保存' ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}>{saveMsg}</span>}
+        {saveMsg && <span className={`text-xs ${saveMsg === '已保存' || saveMsg.includes('已更新') ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}>{saveMsg}</span>}
       </div>
     </div>
   );

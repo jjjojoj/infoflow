@@ -120,6 +120,7 @@ export interface CreateInterestData {
 
 export interface ObsidianStatus {
   vault_path: string;
+  host_path: string;
   available: boolean;
   note_count: number;
   inbox_count: number;

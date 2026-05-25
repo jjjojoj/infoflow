@@ -7,7 +7,9 @@ services:
       - "8000:8000"
     volumes:
       - backend_data:/app/data
-      - obsidian_vault:/app/data/obsidian_vault
+      - ./data/obsidian_vault:/app/data/obsidian_vault
+    environment:
+      - HOST_VAULT_PATH=D:\qoder工作区\信息助手\data\obsidian_vault
     env_file:
       - .env
     networks:
@@ -31,7 +33,6 @@ services:
 
 volumes:
   backend_data:
-  obsidian_vault:
 
 networks:
   infoflow:

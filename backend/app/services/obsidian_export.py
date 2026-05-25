@@ -932,9 +932,14 @@ community: "{community}"
 
     async def status(self) -> dict:
         """返回 vault 状态信息"""
+        # 推导宿主机路径: Docker 内 /app/data/obsidian_vault -> 宿主机路径
+        # 从环境变量 HOST_VAULT_PATH 读取，或尝试从 /proc/1/mountinfo 推导
+        host_path = self._detect_host_path()
+
         if not self.vault_path.exists():
             return {
                 "vault_path": str(self.vault_path),
+                "host_path": host_path,
                 "available": False,
                 "note_count": 0,
                 "areas": {},
@@ -968,12 +973,49 @@ community: "{community}"
 
         return {
             "vault_path": str(self.vault_path),
+            "host_path": host_path,
             "available": True,
             "note_count": total_notes,
             "inbox_count": inbox_count,
             "areas": areas_stats,
             "last_updated": last_updated,
         }
+
+    def _detect_host_path(self) -> str:
+        """尝试检测宿主机上的 vault 路径。
+
+        优先级:
+        1. 环境变量 HOST_VAULT_PATH（用户显式指定）
+        2. 从 /proc/1/mountinfo 解析 bind mount
+        3. 猜测常见 Windows WSL 路径
+        """
+        import os
+
+        # 1. 环境变量
+        env_path = os.environ.get("HOST_VAULT_PATH", "")
+        if env_path:
+            return env_path
+
+        # 2. 从 mountinfo 推导（仅 Linux/Docker）
+        try:
+            mount_info = Path("/proc/1/mountinfo")
+            if mount_info.exists():
+                for line in mount_info.read_text().splitlines():
+                    parts = line.split()
+                    # 格式: ... mount_point - fs_type mount_source ...
+                    if len(parts) >= 10 and str(self.vault_path) in parts[4]:
+                        # parts[9] 是 mount source
+                        src = parts[9]
+                        if src.startswith("/mnt/"):
+                            # WSL: /mnt/d/xxx -> D:\xxx
+                            drive = src[5].upper()
+                            rest = src[6:]
+                            return f"{drive}:{rest.replace('/', chr(92))}"
+                        return src
+        except Exception:
+            pass
+
+        return ""
 
 
 # 模块级单例
