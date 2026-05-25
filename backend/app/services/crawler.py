@@ -243,6 +243,10 @@ class CrawlerService:
                 await session.rollback()
                 new_count = 0
 
+        # Generate AI summaries for articles without one
+        if new_count > 0:
+            await self._generate_missing_summaries(session)
+
         return new_count
 
     async def _translate_title(self, title: str, content_hint: str, source_name: str) -> str:
@@ -298,6 +302,38 @@ class CrawlerService:
             if keyword and keyword in text:
                 score += interest.weight
         return min(score, 1.0)
+
+    async def _generate_missing_summaries(self, session: Any) -> None:
+        """Call LLM to generate summaries for articles that lack one."""
+        from .ai_analyzer import ai_analyzer
+
+        stmt = select(Article).where(
+            (Article.summary == None) | (Article.summary == "")  # noqa: E711
+        ).order_by(Article.id.desc()).limit(20)
+        result = await session.execute(stmt)
+        articles = result.scalars().all()
+
+        if not articles:
+            return
+
+        logger.info("Generating AI summaries for %d articles", len(articles))
+        for article in articles:
+            try:
+                text = f"标题：{article.title}\n\n内容：{(article.content or '')[:2000]}"
+                summary = await asyncio.wait_for(
+                    ai_analyzer.generate_summary(text),
+                    timeout=30,
+                )
+                if summary:
+                    article.summary = summary
+                    await session.commit()
+                    logger.info("Generated summary for article id=%d", article.id)
+            except asyncio.TimeoutError:
+                logger.warning("Summary generation timed out for article id=%d", article.id)
+                await session.rollback()
+            except Exception as e:
+                logger.warning("Summary generation failed for article id=%d: %s", article.id, e)
+                await session.rollback()
 
 
 crawler_service = CrawlerService()
