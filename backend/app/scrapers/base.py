@@ -42,6 +42,31 @@ BROAD_KEYWORDS = [
 # Combined list (for backward compat)
 KEYWORDS = CORE_KEYWORDS + BROAD_KEYWORDS
 
+# Interest category → representative keywords (for auto-tagging articles)
+# Used by the frontend "My Insights" page to group articles by interest tabs.
+INTEREST_CATEGORIES: dict[str, list[str]] = {
+    "OCR技术": ["OCR", "ocr", "文字识别", "document AI", "PaddleOCR", "paddleocr",
+                "文档解析", "document understanding", "text recognition"],
+    "昇腾/NPU": ["昇腾", "ascend", "鲲鹏", "CANN", "MindSpore", "NPU", "npu",
+                 "信创", "国产化", "华为"],
+    "模型部署": ["部署", "deploy", "onnx", "tensorrt", "推理", "inference",
+                "量化", "quantiz", "加速", "accelerat", "edge inference"],
+    "大模型": ["DeepSeek", "deepseek", "Qwen", "qwen", "LLM", "大模型",
+              "transformer", "微调", "fine-tun", "RAG"],
+    "工程化": ["PyTorch", "pytorch", "训练", "training", "FSDP", "分布式",
+             "蒸馏", "distill", "embedding", "agent"],
+}
+
+
+def match_interest_tags(title: str, content: str) -> list[str]:
+    """Return interest category labels that match the given article text."""
+    text = f"{title} {content}".lower()
+    matched = []
+    for category, keywords in INTEREST_CATEGORIES.items():
+        if any(kw.lower() in text for kw in keywords):
+            matched.append(category)
+    return matched
+
 
 @dataclass
 class RawArticle:

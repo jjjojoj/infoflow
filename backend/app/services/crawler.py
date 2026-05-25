@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 from ..database import AsyncSessionLocal
 from ..models import Article, Interest, Source
 from ..scrapers.arxiv import ArxivScraper
-from ..scrapers.base import KEYWORDS, CORE_KEYWORDS, BROAD_KEYWORDS
+from ..scrapers.base import KEYWORDS, CORE_KEYWORDS, BROAD_KEYWORDS, match_interest_tags
 from ..scrapers.github_trending import GitHubTrendingScraper
 from ..scrapers.huawei_ascend import HuaweiAscendScraper
 from ..scrapers.zhihu import ZhihuScraper
@@ -223,6 +223,11 @@ class CrawlerService:
                 # Compute content hash
                 hash_value = content_hash(content)
 
+                # Auto-tag with interest categories based on matched keywords
+                interest_tags = match_interest_tags(title, content)
+                original_tags = article_data.get("tags", []) or []
+                merged_tags = list(dict.fromkeys(original_tags + interest_tags))
+
                 # Create Article ORM object
                 article = Article(
                     title=title[:512],
@@ -231,7 +236,7 @@ class CrawlerService:
                     summary=article_data.get("summary") or "",
                     source_name=source_name,
                     source_type=article_data.get("source_type", ""),
-                    tags=article_data.get("tags", []),
+                    tags=merged_tags,
                     content_hash=hash_value,
                     fetch_method=article_data.get("fetch_method"),
                     is_read=False,

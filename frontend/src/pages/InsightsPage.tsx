@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lightbulb, FileText, Clock, ChevronRight, Loader2, Search } from 'lucide-react';
 import { getArticles } from '../services/api';
-import { getInterests } from '../services/api';
 import type { Article } from '../types';
-import type { Interest } from '../types';
 import { formatSourceName, formatSourceType } from '../utils/sourceDisplay';
 
 const PAGE_SIZE = 20;
@@ -18,22 +16,16 @@ const sourceTypeColors: Record<string, string> = {
 export default function InsightsPage() {
   const navigate = useNavigate();
   const [allArticles, setAllArticles] = useState<Article[]>([]);
-  const [interests, setInterests] = useState<Interest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeInterest, setActiveInterest] = useState<string>('all');
+  const [activeTag, setActiveTag] = useState<string>('all');
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [articlesRes, interestsRes] = await Promise.all([
-          getArticles({ limit: 500, skip: 0 }),
-          getInterests(),
-        ]);
-        setAllArticles(articlesRes.data.items ?? []);
-        const interestData = interestsRes.data as any;
-        setInterests(interestData?.items ?? (Array.isArray(interestData) ? interestData : []));
+        const res = await getArticles({ limit: 500, skip: 0 });
+        setAllArticles(res.data.items ?? []);
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {
@@ -42,6 +34,12 @@ export default function InsightsPage() {
     }
     fetchData();
   }, []);
+
+  // Extract unique interest category tags from all articles
+  const INTEREST_LABELS = ['OCR技术', '昇腾/NPU', '模型部署', '大模型', '工程化'];
+  const availableTags = INTEREST_LABELS.filter(label =>
+    allArticles.some(a => (a.tags || []).includes(label))
+  );
 
   // Filter articles
   const filtered = allArticles.filter(a => {
@@ -52,11 +50,9 @@ export default function InsightsPage() {
         return false;
       }
     }
-    // Interest keyword filter
-    if (activeInterest !== 'all') {
-      const kw = activeInterest.toLowerCase();
-      const text = `${a.title} ${a.content || ''} ${(a.tags || []).join(' ')}`.toLowerCase();
-      if (!text.includes(kw)) return false;
+    // Interest category tag filter
+    if (activeTag !== 'all') {
+      if (!(a.tags || []).includes(activeTag)) return false;
     }
     return true;
   });
@@ -94,26 +90,26 @@ export default function InsightsPage() {
         </div>
       </div>
 
-      {/* Interest filter tabs */}
-      {interests.length > 0 && (
+      {/* Interest category tabs */}
+      {availableTags.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => { setActiveInterest('all'); setPage(1); }}
-            className={`rounded-full px-3 py-1 text-xs transition ${activeInterest === 'all'
+            onClick={() => { setActiveTag('all'); setPage(1); }}
+            className={`rounded-full px-3 py-1 text-xs transition ${activeTag === 'all'
               ? 'bg-[#6366f1] text-white'
               : 'bg-[#1e2d3d] text-[#94a3b8] hover:text-white'}`}
           >
             全部
           </button>
-          {interests.filter(i => i.enabled).map(i => (
+          {availableTags.map(tag => (
             <button
-              key={i.id}
-              onClick={() => { setActiveInterest(i.keyword); setPage(1); }}
-              className={`rounded-full px-3 py-1 text-xs transition ${activeInterest === i.keyword
+              key={tag}
+              onClick={() => { setActiveTag(tag); setPage(1); }}
+              className={`rounded-full px-3 py-1 text-xs transition ${activeTag === tag
                 ? 'bg-[#6366f1] text-white'
                 : 'bg-[#1e2d3d] text-[#94a3b8] hover:text-white'}`}
             >
-              {i.keyword}
+              {tag}
             </button>
           ))}
         </div>
@@ -173,7 +169,7 @@ export default function InsightsPage() {
 
       {filtered.length === 0 && (
         <div className="py-12 text-center text-sm text-[#64748b]">
-          {searchQuery || activeInterest !== 'all' ? '没有匹配的文章' : '暂无文章数据，请先添加信息源并采集文章'}
+          {searchQuery || activeTag !== 'all' ? '没有匹配的文章' : '暂无文章数据，请先添加信息源并采集文章'}
         </div>
       )}
 
