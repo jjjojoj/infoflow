@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Lightbulb, FileText, Clock, ChevronRight, Loader2 } from 'lucide-react';
 import { getArticles } from '../services/api';
 import type { Article } from '../types';
+import { formatSourceName, formatSourceType } from '../utils/sourceDisplay';
 
 const sourceTypeColors: Record<string, string> = {
   arxiv: '#6366f1',
+  crawler: '#6366f1',
+  github_trending: '#818cf8',
   github: '#818cf8',
   zhihu: '#f59e0b',
   huawei_ascend: '#10b981',
@@ -59,7 +62,9 @@ export default function InsightsPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {articles.map((article) => {
           const color = sourceTypeColors[article.source_type || ''] || '#6366f1';
-          const category = article.source_type || article.source_name || '其他';
+          const category = article.source_type === 'rss'
+            ? formatSourceName(article.source_name)
+            : formatSourceType(article.source_name || article.source_type);
           return (
             <div
               key={article.id}
@@ -96,7 +101,7 @@ export default function InsightsPage() {
                 </span>
                 <span className="flex items-center gap-1">
                   <FileText size={11} />
-                  {article.source_name || '未知来源'}
+                  {formatSourceName(article.source_name)}
                 </span>
                 <span className="flex items-center gap-1">
                   <Lightbulb size={11} />

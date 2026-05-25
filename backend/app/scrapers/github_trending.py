@@ -1,7 +1,9 @@
 """GitHub Trending scraper."""
 from __future__ import annotations
 
+import html
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -28,12 +30,12 @@ class GitHubTrendingScraper(BaseScraper):
     source_type = "crawler"
 
     def __init__(self) -> None:
-        self._url = "https://github.com/trending"
+        self._url = "https://github.com/trending/python?since=daily"
 
     async def fetch(self, **kwargs: Any) -> list[dict[str, Any]]:
         """Fetch GitHub Trending page and parse repos.
 
-        Attempts to use Scrapling Fetcher first; falls back to httpx if unavailable.
+        Uses plain httpx because browser-style fetchers are brittle in Docker.
         """
         html = await self._fetch_html()
         if not html:
@@ -41,19 +43,7 @@ class GitHubTrendingScraper(BaseScraper):
         return await self.parse(html)
 
     async def _fetch_html(self) -> str:
-        """Get the trending page HTML with fallback strategy."""
-        # Try Scrapling Fetcher first
-        try:
-            from scrapling import Fetcher
-
-            fetcher = Fetcher()
-            response = fetcher.get(self._url)
-            if response and response.status == 200:
-                return response.text
-        except Exception as e:
-            logger.warning("Scrapling Fetcher failed for GitHub Trending, falling back to httpx: %s", e)
-
-        # Fallback to httpx
+        """Get the trending page HTML."""
         try:
             async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
                 resp = await client.get(
@@ -66,46 +56,72 @@ class GitHubTrendingScraper(BaseScraper):
                 resp.raise_for_status()
                 return resp.text
         except Exception as e:
-            logger.error("httpx fallback also failed for GitHub Trending: %s", e)
+            logger.error("GitHub Trending fetch failed: %s", e)
             return ""
 
     async def parse(self, raw_data: Any) -> list[dict[str, Any]]:
-        """Parse trending page HTML into article dicts."""
-        try:
-            from selectolax.parser import HTMLParser
-        except ImportError:
-            logger.error("selectolax not available, cannot parse GitHub Trending page")
-            return []
-
-        tree = HTMLParser(raw_data)
+        """Parse trending page HTML into article dicts using regex."""
+        raw_html = str(raw_data)
         articles: list[dict[str, Any]] = []
 
-        for row in tree.css("article.Box-row"):
+        rows = re.findall(
+            r"<article\b[^>]*class=\"[^\"]*Box-row[^\"]*\"[^>]*>(.*?)</article>",
+            raw_html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        for row in rows:
             try:
-                # Repository name (owner/repo)
-                h2 = row.css_first("h2 a")
-                if not h2:
+                repo_match = re.search(
+                    r"<h2\b[^>]*>.*?<a\b[^>]*href=\"/([^\"?#]+)\"[^>]*>(.*?)</a>.*?</h2>",
+                    row,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if not repo_match:
+                    repo_match = re.search(
+                        r"<a\b[^>]*href=\"/([^\"?#]+/[^\"?#]+)\"[^>]*>",
+                        row,
+                        flags=re.IGNORECASE | re.DOTALL,
+                    )
+                if not repo_match:
                     continue
-                repo_path = h2.attributes.get("href", "").strip("/")
+
+                repo_path = html.unescape(repo_match.group(1)).strip("/")
+                if repo_path.count("/") != 1:
+                    continue
+                repo_path = re.sub(r"\s+", "", repo_path)
                 if not repo_path:
                     continue
-                repo_name = repo_path.replace("/", " / ").strip()
 
-                # Description
-                p_tag = row.css_first("p")
-                description = p_tag.text(strip=True) if p_tag else ""
+                repo_name = repo_path.replace("/", " / ")
 
-                # Language
-                lang_span = row.css_first("[itemprop='programmingLanguage']")
-                language = lang_span.text(strip=True) if lang_span else ""
+                description = ""
+                desc_match = re.search(
+                    r"<p\b[^>]*>(.*?)</p>",
+                    row,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if desc_match:
+                    description = self._clean_html(desc_match.group(1))
 
-                # Stars
+                language = ""
+                lang_match = re.search(
+                    r"<span\b[^>]*itemprop=\"programmingLanguage\"[^>]*>(.*?)</span>",
+                    row,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if lang_match:
+                    language = self._clean_html(lang_match.group(1))
+
                 stars_text = ""
-                star_links = row.css("a.Link--muted")
-                if star_links:
-                    stars_text = star_links[0].text(strip=True).replace(",", "")
+                star_match = re.search(
+                    r'href="/%s/stargazers"[^>]*>(.*?)</a>' % re.escape(repo_path),
+                    row,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if star_match:
+                    stars_text = self._clean_html(star_match.group(1)).replace(",", "")
 
-                # Filter by keywords
                 combined_text = f"{repo_name} {description} {language}".lower()
                 if not any(kw.lower() in combined_text for kw in _FILTER_KEYWORDS):
                     continue
@@ -134,3 +150,10 @@ class GitHubTrendingScraper(BaseScraper):
 
         logger.info("GitHub Trending: found %d relevant repos", len(articles))
         return articles
+
+    @staticmethod
+    def _clean_html(value: str) -> str:
+        """Strip tags/entities and normalize whitespace."""
+        value = re.sub(r"<[^>]+>", " ", value)
+        value = html.unescape(value)
+        return re.sub(r"\s+", " ", value).strip()

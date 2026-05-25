@@ -15,6 +15,7 @@ import CategoryNode from './nodes/CategoryNode';
 import LeafNode from './nodes/LeafNode';
 import { getArticles } from '../../services/api';
 import type { Article } from '../../types';
+import { formatSourceName } from '../../utils/sourceDisplay';
 
 const nodeTypes = {
   centerNode: CenterNode,
@@ -34,8 +35,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   'cs.SE': '软件工程',
   'cs.CR': '密码安全',
   'cs.NE': '神经计算',
-  arxiv: 'arXiv',
-  github: 'GitHub',
+  arxiv: 'arXiv 论文',
+  github: 'GitHub 热门',
+  github_trending: 'GitHub 热门',
   zhihu: '知乎',
   huawei_ascend: '昇腾社区',
   rss: 'RSS',
@@ -199,7 +201,7 @@ export default function GraphView({ compact = false }: GraphViewProps) {
           break;
         }
       }
-      if (!groups[key]) groups[key] = CATEGORY_LABELS[key] || key;
+      if (!groups[key]) groups[key] = CATEGORY_LABELS[key] || formatSourceName(key);
     });
     return Object.entries(groups).map(([key, label], i) => ({
       label,

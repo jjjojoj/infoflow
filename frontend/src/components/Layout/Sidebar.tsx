@@ -22,6 +22,8 @@ const navItems = [
 
 const sourceTypeColors: Record<string, string> = {
   arxiv: '#6366f1',
+  crawler: '#6366f1',
+  github_trending: '#818cf8',
   github: '#818cf8',
   zhihu: '#f59e0b',
   huawei_ascend: '#10b981',

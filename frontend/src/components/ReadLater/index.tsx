@@ -3,6 +3,7 @@ import { Check, Trash2, Filter, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getArticles, bookmarkArticle, markRead } from '../../services/api';
 import type { Article } from '../../types';
+import { formatSourceName } from '../../utils/sourceDisplay';
 
 const tagColors: Record<string, string> = {
   '技术突破': '#6366f1',
@@ -114,7 +115,7 @@ export default function ReadLater() {
                 {article.title}
               </h3>
               <div className="mt-1.5 flex items-center gap-2">
-                <span className="text-xs text-[var(--color-text-muted)]">{article.source_name || '未知'}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">{formatSourceName(article.source_name)}</span>
                 <span className="text-xs text-[var(--color-text-muted)]">·</span>
                 <span className="text-xs text-[var(--color-text-muted)]">
                   {new Date(article.created_at).toLocaleDateString('zh-CN')}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Hash, Clock, Loader2 } from 'lucide-react';
 import { getArticles } from '../../services/api';
 import type { Article } from '../../types';
+import { formatSourceName } from '../../utils/sourceDisplay';
 
 export default function Timeline() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -67,7 +68,7 @@ export default function Timeline() {
                 {article.title}
               </p>
               <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[#64748b]">
-                <span>{article.source_name || ''}</span>
+                <span>{formatSourceName(article.source_name)}</span>
                 {article.tags && article.tags.length > 0 && (
                   <span className="flex items-center gap-0.5">
                     <Hash size={8} />

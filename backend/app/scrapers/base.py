@@ -9,9 +9,25 @@ from typing import Any
 
 # Predefined keywords for filtering relevant content
 KEYWORDS = [
-    "昇腾910b", "鲲鹏", "OCR", "信创", "CANN", "MindSpore",
-    "PaddleOCR", "文字识别", "模型部署", "国产化", "深度学习",
-    "ascend", "mindspore", "paddleocr",
+    # 核心技术
+    "OCR", "文字识别", "optical character recognition", "document AI",
+    "text recognition", "document understanding",
+    # 信创/国产化
+    "昇腾", "鲲鹏", "信创", "CANN", "MindSpore", "国产化",
+    "ascend", "huawei ai", "npu",
+    # AI框架与部署
+    "PaddleOCR", "paddleocr", "模型部署", "inference", "onnx",
+    "tensorrt", "量化", "quantiz", "蒸馏", "distill",
+    # 深度学习
+    "深度学习", "deep learning", "transformer", "大模型", "LLM",
+    "多模态", "multimodal", "计算机视觉", "computer vision",
+    "目标检测", "object detection", "图像分割", "segmentation",
+    # 工具与框架
+    "PyTorch", "pytorch", "Qwen", "DeepSeek", "Yi",
+    "Stable Diffusion", "diffusion", "GAN",
+    # AI 应用
+    "RAG", "agent", "fine-tun", "微调", "训练", "train",
+    "embedding", "向量数据库", "vector database",
 ]
 
 

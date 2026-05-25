@@ -2,21 +2,16 @@ import { Rss, RefreshCw, Loader2, CheckCircle, XCircle, ExternalLink } from 'luc
 import { getSources, fetchSource } from '../../services/api';
 import type { Source } from '../../types';
 import { useEffect, useState } from 'react';
+import { formatSourceName, formatSourceType } from '../../utils/sourceDisplay';
 
 const sourceTypeColors: Record<string, string> = {
   arxiv: '#6366f1',
+  github_trending: '#818cf8',
   github: '#818cf8',
+  crawler: '#6366f1',
   zhihu: '#f59e0b',
   huawei_ascend: '#10b981',
   rss: '#ec4899',
-};
-
-const sourceTypeLabels: Record<string, string> = {
-  arxiv: 'arXiv',
-  github: 'GitHub Trending',
-  zhihu: '知乎',
-  huawei_ascend: '昇腾社区',
-  rss: 'RSS',
 };
 
 export default function SourceManager() {
@@ -81,7 +76,7 @@ export default function SourceManager() {
         <div className="space-y-3">
           {sources.map((source) => {
             const color = sourceTypeColors[source.source_type || ''] || '#6366f1';
-            const typeLabel = sourceTypeLabels[source.source_type || ''] || source.source_type || '未知';
+            const typeLabel = formatSourceType(source.source_type);
             const isFetching = fetchingId === source.id;
 
             return (
@@ -100,7 +95,7 @@ export default function SourceManager() {
 
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-medium text-[#f1f5f9]">{source.name}</h4>
+                        <h4 className="text-sm font-medium text-[#f1f5f9]">{formatSourceName(source.name)}</h4>
                         <span
                           className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                           style={{ backgroundColor: `${color}15`, color }}

@@ -17,7 +17,7 @@ export interface Article {
   community?: string | null;
 }
 
-export type SourceType = 'rss' | 'github' | 'arxiv' | 'zhihu' | 'huawei_ascend' | 'custom';
+export type SourceType = 'rss' | 'crawler' | 'github' | 'github_trending' | 'arxiv' | 'zhihu' | 'huawei_ascend' | 'custom';
 
 export interface Source {
   id: number;
@@ -75,7 +75,7 @@ export interface DashboardStats {
 }
 
 export interface Settings {
-  llm_provider: 'deepseek' | 'openai' | 'ollama';
+  llm_provider: 'deepseek' | 'openai' | 'ollama' | 'dashscope';
   llm_model: string;
   llm_api_key: string;
   llm_base_url: string;

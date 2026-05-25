@@ -10,13 +10,50 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 
 from .config import settings
-from .database import init_db
+from .database import AsyncSessionLocal, init_db
+from .models import Source
 from .routers import articles, insights, obsidian, settings as settings_router, sources, stats
 from .services.scheduler import scheduler_service
 
 logger = logging.getLogger(__name__)
+
+NEW_RSS_SOURCES = [
+    {"name": "机器之心", "url": "https://www.jiqizhixin.com/rss", "category": "AI新闻"},
+    {"name": "量子位", "url": "https://www.qbitai.com/feed", "category": "AI新闻"},
+    {"name": "HuggingFace Blog", "url": "https://huggingface.co/blog/feed.xml", "category": "AI技术"},
+    {"name": "Papers with Code", "url": "https://paperswithcode.com/rss", "category": "论文"},
+    {"name": "掘金 AI", "url": "https://rsshub.app/juejin/trending/ai/monthly", "category": "技术社区"},
+    {"name": "OpenAI Blog", "url": "https://openai.com/blog/rss.xml", "category": "AI技术"},
+    {"name": "DeepSeek", "url": "https://api-deepseek-docs.synology.me/rss.xml", "category": "AI技术"},
+    {"name": "AI前线", "url": "https://www.infoq.cn/public/v1/article/list?tag=AI", "category": "AI新闻"},
+]
+
+
+async def ensure_default_rss_sources() -> None:
+    """Insert recommended RSS sources if they are not already configured."""
+    async with AsyncSessionLocal() as session:
+        created = 0
+        for item in NEW_RSS_SOURCES:
+            result = await session.execute(select(Source).where(Source.name == item["name"]))
+            if result.scalar_one_or_none():
+                continue
+            session.add(
+                Source(
+                    name=item["name"],
+                    url=item["url"],
+                    source_type="rss",
+                    enabled=True,
+                    fetch_interval=settings.FETCH_INTERVAL_MINUTES,
+                    config={"category": item["category"]},
+                )
+            )
+            created += 1
+        if created:
+            await session.commit()
+            logger.info("Registered %d default RSS sources", created)
 
 
 @asynccontextmanager
@@ -24,6 +61,7 @@ async def lifespan(app: FastAPI):
     """Startup/shutdown hooks: init DB and manage scheduler lifecycle."""
     logger.info("InfoFlow backend starting up...")
     await init_db()
+    await ensure_default_rss_sources()
     try:
         scheduler_service.start()
     except Exception as exc:  # pragma: no cover - defensive

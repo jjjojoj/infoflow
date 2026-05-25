@@ -6,6 +6,7 @@ import GraphView from '../KnowledgeGraph/GraphView';
 import Timeline from '../Timeline';
 import { getArticle } from '../../services/api';
 import type { Article } from '../../types';
+import { formatSourceName } from '../../utils/sourceDisplay';
 
 const tagColors: Record<string, string> = {
   '技术突破': '#6366f1',
@@ -79,7 +80,7 @@ export default function ArticleDetail() {
             <div className="mt-2 flex items-center gap-3 text-sm text-[var(--color-text-secondary)]">
               <span>{timeAgo}</span>
               <span className="text-[var(--color-border-subtle)]">·</span>
-              <span>{article.source_name || '未知来源'}</span>
+              <span>{formatSourceName(article.source_name)}</span>
               {article.url && (
                 <>
                   <span className="text-[var(--color-border-subtle)]">·</span>

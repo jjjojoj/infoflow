@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { getArticles, getSources } from '../../services/api';
 import type { Article, DashboardStats } from '../../types';
 import TrendChart from './TrendChart';
+import { formatSourceName } from '../../utils/sourceDisplay';
 
 const defaultStats: DashboardStats = {
   new_articles: 0,
@@ -159,7 +160,7 @@ export default function Dashboard() {
                   <span className="text-xs text-[var(--color-text-muted)]">
                     {new Date(article.created_at).toLocaleDateString('zh-CN')}
                   </span>
-                  <span className="text-[11px] text-[var(--color-text-muted)]">{article.source_name}</span>
+                  <span className="text-[11px] text-[var(--color-text-muted)]">{formatSourceName(article.source_name)}</span>
                 </div>
               </div>
             ))}
