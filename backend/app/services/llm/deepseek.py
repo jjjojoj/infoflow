@@ -58,8 +58,8 @@ class DeepSeekLLM(BaseLLM):
             )
             return resp
         except Exception as e:
-            logger.error("DeepSeek API 调用失败: %s", e)
-            return LLMResponse(content="", model=self.model, usage={})
+            logger.exception("DeepSeek API call failed")
+            raise RuntimeError(f"DeepSeek API request failed: {e}") from e
 
     async def summarize(self, text: str, max_length: int = 200) -> str:
         """生成文本摘要。"""

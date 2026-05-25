@@ -1,10 +1,13 @@
 """Settings router - read/update settings, interests CRUD, LLM test."""
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import os
 import re
+import socket
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -19,6 +22,17 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 # Persistent settings file path (inside Docker container)
 _SETTINGS_FILE = "/app/data/settings.json"
+
+
+def _mask_key(v: str | None) -> str:
+    """Mask API key for safe display: show first 4 and last 4 chars."""
+    if not v or len(v) < 12:
+        return "" if not v else f"{v[:2]}***"
+    return f"{v[:4]}...{v[-4:]}"
+
+
+# Fields that contain secrets and must be masked in GET responses
+_SECRET_FIELDS = {"deepseek_api_key", "openai_api_key", "dashscope_api_key", "ollama_api_key"}
 
 
 def _read_settings_file() -> dict:
@@ -72,8 +86,12 @@ class InterestResponse(BaseModel):
 
 @router.get("")
 async def get_settings() -> dict:
-    """Return current persisted settings."""
-    return _read_settings_file()
+    """Return current persisted settings with API keys masked."""
+    data = _read_settings_file()
+    for key in _SECRET_FIELDS:
+        if key in data:
+            data[key] = _mask_key(data[key])
+    return data
 
 
 @router.put("")
@@ -100,6 +118,13 @@ async def update_settings(payload: dict) -> dict:
     # Clear lru_cache so next get_settings() picks up new env vars
     from ..config import get_settings as _cached_get_settings
     _cached_get_settings.cache_clear()
+
+    # Reset ai_analyzer's cached LLM provider so it picks up the new config
+    try:
+        from ..services.ai_analyzer import ai_analyzer
+        ai_analyzer.reset_llm()
+    except Exception:
+        pass
 
     return {"updated": True, **current}
 
@@ -192,6 +217,8 @@ async def test_llm():
             messages=[{"role": "user", "content": "请用一句话介绍你自己。"}],
             max_tokens=100,
         )
+        if not resp.content.strip():
+            return {"success": False, "error": "LLM returned empty response"}
         return {"success": True, "response": resp.content[:100], "model": resp.model}
     except Exception as e:
         return {"success": False, "error": str(e)}

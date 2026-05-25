@@ -31,7 +31,7 @@ export default function ScheduleConfig() {
         if (s.fetch_interval && s.fetch_interval >= 60) {
           setUnit('minutes');
         }
-        const srcData = Array.isArray(sourcesRes.data) ? sourcesRes.data : ((sourcesRes.data as any)?.items ?? []);
+        const srcData = sourcesRes.data.items ?? [];
         setSources(srcData);
       } catch {
         // Use defaults if settings endpoint not available

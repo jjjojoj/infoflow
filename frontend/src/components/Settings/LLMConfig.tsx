@@ -38,7 +38,7 @@ export default function LLMConfig() {
   // Load current LLM settings from backend
   useEffect(() => {
     getSettings().then(res => {
-      const s = res.data as any;
+      const s = res.data as Record<string, any>;
       if (s.llm_provider) setForm(f => ({ ...f, provider: s.llm_provider }));
       if (s.deepseek_api_key) setForm(f => ({ ...f, deepseek_api_key: s.deepseek_api_key }));
       if (s.openai_api_key) setForm(f => ({ ...f, openai_api_key: s.openai_api_key }));

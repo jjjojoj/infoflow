@@ -58,8 +58,8 @@ class DashScopeLLM(BaseLLM):
             )
             return resp
         except Exception as e:
-            logger.error("DashScope API 调用失败: %s", e)
-            return LLMResponse(content="", model=self.model, usage={})
+            logger.exception("DashScope API call failed")
+            raise RuntimeError(f"DashScope API request failed: {e}") from e
 
     async def summarize(self, text: str, max_length: int = 200) -> str:
         """生成结构化 Markdown 摘要。"""

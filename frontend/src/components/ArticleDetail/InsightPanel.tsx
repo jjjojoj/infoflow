@@ -84,7 +84,7 @@ export default function InsightPanel({ article: art, onClose }: InsightPanelProp
             <h4 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">原文链接</h4>
             <div
               className="flex items-center justify-between rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 hover:bg-[var(--color-bg-elevated)] transition-colors cursor-pointer"
-              onClick={() => window.open(art.url!, '_blank')}
+              onClick={() => window.open(art.url!, '_blank', 'noopener,noreferrer')}
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm">📄</span>

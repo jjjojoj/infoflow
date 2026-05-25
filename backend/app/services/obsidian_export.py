@@ -20,6 +20,32 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _yaml_str(s: str) -> str:
+    """Escape a value for safe embedding in a YAML double-quoted scalar."""
+    if s is None:
+        return ""
+    out: list[str] = []
+    for ch in str(s):
+        cp = ord(ch)
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ch == "\0":
+            out.append("\\0")
+        elif cp < 0x20 or cp == 0x7F:
+            out.append(f"\\x{cp:02x}")
+        else:
+            out.append(ch)
+    return "".join(out)
+
 # ─── Area 映射规则 ──────────────────────────────────────────────────────────────
 
 AREA_TAG_MAPPING: dict[str, list[str]] = {
@@ -400,12 +426,12 @@ class ObsidianExporter:
 
     def _generate_frontmatter(self, article: dict, analysis: dict | None = None) -> str:
         """生成 YAML frontmatter"""
-        title = article.get("title", "无标题").replace('"', '\\"')
-        source_url = article.get("url", "")
-        source_name = article.get("source_name", "unknown")
+        title = _yaml_str(article.get("title", "无标题"))
+        source_url = _yaml_str(article.get("url", ""))
+        source_name = _yaml_str(article.get("source_name", "unknown"))
         tags = article.get("tags") or []
-        summary = (article.get("summary") or "")[:200].replace('"', '\\"')
-        community = article.get("community") or ""
+        summary = _yaml_str((article.get("summary") or "")[:200])
+        community = _yaml_str(article.get("community") or "")
         relevance_score = article.get("relevance_score", 0.0)
         created = article.get("created_at", datetime.now().isoformat())
 
@@ -416,14 +442,14 @@ class ObsidianExporter:
         confidence = 0.0
         related_notes: list[str] = []
         if analysis:
-            summary = analysis.get("summary", summary)[:200].replace('"', '\\"')
+            summary = _yaml_str(analysis.get("summary", (article.get("summary") or ""))[:200])
             confidence = analysis.get("relevance_score", 0.0)
             related_topics = analysis.get("related_topics", [])
-            related_notes = [f"[[{t}]]" for t in related_topics[:5]]
+            related_notes = [f"[[{_yaml_str(t)}]]" for t in related_topics[:5]]
 
         # 格式化 tags 为 YAML 列表
-        tags_yaml = "\n".join(f"  - {t}" for t in tags) if tags else "  []"
-        related_yaml = "\n".join(f"  - \"{n}\"" for n in related_notes) if related_notes else "  []"
+        tags_yaml = "\n".join(f"  - {_yaml_str(t)}" for t in tags) if tags else "  []"
+        related_yaml = "\n".join(f'  - "{n}"' for n in related_notes) if related_notes else "  []"
 
         fm = f"""---
 title: "{title}"

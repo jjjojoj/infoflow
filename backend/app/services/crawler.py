@@ -78,6 +78,7 @@ class CrawlerService:
                             SOURCE_TIMEOUT_SECONDS,
                         )
                     except Exception as e:
+                        await session.rollback()
                         logger.exception("Error running source '%s': %s", src_name, e)
                         continue
 

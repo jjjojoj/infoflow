@@ -55,8 +55,8 @@ class OpenAILLM(BaseLLM):
             )
             return resp
         except Exception as e:
-            logger.error("OpenAI API 调用失败: %s", e)
-            return LLMResponse(content="", model=self.model, usage={})
+            logger.exception("OpenAI API call failed")
+            raise RuntimeError(f"OpenAI API request failed: {e}") from e
 
     async def summarize(self, text: str, max_length: int = 200) -> str:
         """生成文本摘要。"""

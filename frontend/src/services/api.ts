@@ -37,7 +37,7 @@ export const markRead = (id: number) =>
 
 // Sources
 export const getSources = () =>
-  api.get<Source[]>('/sources');
+  api.get<{ items: Source[]; total: number }>('/sources');
 
 export const createSource = (data: CreateSourceData) =>
   api.post<Source>('/sources', data);
@@ -67,7 +67,7 @@ export const updateSettings = (data: Partial<Settings>) =>
 
 // Interests
 export const getInterests = () =>
-  api.get<Interest[]>('/settings/interests');
+  api.get<{ items: Interest[] }>('/settings/interests');
 
 export const createInterest = (data: CreateInterestData) =>
   api.post<Interest>('/settings/interests', data);
