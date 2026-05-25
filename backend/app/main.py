@@ -21,14 +21,14 @@ from .services.scheduler import scheduler_service
 logger = logging.getLogger(__name__)
 
 NEW_RSS_SOURCES = [
-    {"name": "机器之心", "url": "https://www.jiqizhixin.com/rss", "category": "AI新闻"},
     {"name": "量子位", "url": "https://www.qbitai.com/feed", "category": "AI新闻"},
+    {"name": "机器之心", "url": "https://www.jiqizhixin.com/rss", "category": "AI新闻"},
     {"name": "HuggingFace Blog", "url": "https://huggingface.co/blog/feed.xml", "category": "AI技术"},
     {"name": "Papers with Code", "url": "https://paperswithcode.com/rss", "category": "论文"},
-    {"name": "掘金 AI", "url": "https://rsshub.app/juejin/trending/ai/monthly", "category": "技术社区"},
     {"name": "OpenAI Blog", "url": "https://openai.com/blog/rss.xml", "category": "AI技术"},
     {"name": "DeepSeek", "url": "https://api-deepseek-docs.synology.me/rss.xml", "category": "AI技术"},
-    {"name": "AI前线", "url": "https://www.infoq.cn/public/v1/article/list?tag=AI", "category": "AI新闻"},
+    {"name": "IT之家 AI", "url": "https://www.ithome.com/rss/118-11.xml", "category": "科技新闻"},
+    {"name": "36氪 AI", "url": "https://36kr.com/feed", "category": "科技新闻"},
 ]
 
 

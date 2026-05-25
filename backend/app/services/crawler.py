@@ -218,6 +218,7 @@ class CrawlerService:
                     title=title[:512],
                     url=article_data.get("url", ""),
                     content=content,
+                    summary=article_data.get("summary") or "",
                     source_name=source_name,
                     source_type=article_data.get("source_type", ""),
                     tags=article_data.get("tags", []),

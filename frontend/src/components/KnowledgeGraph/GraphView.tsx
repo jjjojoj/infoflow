@@ -55,7 +55,7 @@ function buildGraph(articles: Article[]): { nodes: Node[]; edges: Edge[] } {
   nodes.push({
     id: 'center',
     type: 'centerNode',
-    position: { x: 500, y: 400 },
+    position: { x: 600, y: 450 },
     data: {
       label: 'InfoFlow',
       subtitle: `${articles.length} 篇文章`,
@@ -81,18 +81,21 @@ function buildGraph(articles: Article[]): { nodes: Node[]; edges: Edge[] } {
     groups[key].push(a);
   });
 
-  // Sort groups by size, take top 6
+  // Sort groups by size, take top 8
   const groupEntries = Object.entries(groups)
     .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 6);
+    .slice(0, 8);
 
-  const colors = ['#6366f1', '#818cf8', '#f59e0b', '#10b981', '#ec4899', '#06b6d4'];
+  const colors = ['#6366f1', '#818cf8', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#f97316', '#a78bfa'];
+
+  // Adaptive radius based on number of groups and leaves
+  const catRadius = Math.max(320, groupEntries.length * 50);
+  const maxLeavesPerGroup = 3;
 
   groupEntries.forEach(([key, groupArticles], i) => {
     const angle = (i * 360 / groupEntries.length) * (Math.PI / 180) - Math.PI / 2;
-    const radius = 300;
-    const cx = 500 + Math.cos(angle) * radius;
-    const cy = 400 + Math.sin(angle) * radius;
+    const cx = 600 + Math.cos(angle) * catRadius;
+    const cy = 450 + Math.sin(angle) * catRadius;
     const color = colors[i % colors.length];
     const label = CATEGORY_LABELS[key] || key;
 
@@ -120,15 +123,17 @@ function buildGraph(articles: Article[]): { nodes: Node[]; edges: Edge[] } {
       labelBgStyle: { fill: '#0f1419', fillOpacity: 0.8 },
     });
 
-    // Leaf nodes - show article titles (up to 4 per group)
-    groupArticles.slice(0, 4).forEach((a, j) => {
-      const spreadAngle = 0.4;
-      const leafAngle = angle + (j - (Math.min(4, groupArticles.length) - 1) / 2) * spreadAngle;
-      const leafRadius = radius + 200;
-      const lx = 500 + Math.cos(leafAngle) * leafRadius;
-      const ly = 400 + Math.sin(leafAngle) * leafRadius;
+    // Leaf nodes - spread wider to avoid overlap
+    const leafCount = Math.min(maxLeavesPerGroup, groupArticles.length);
+    const leafSpread = Math.max(0.5, leafCount * 0.25); // wider spread per leaf
+    const leafRadius = catRadius + 220;
 
-      const shortTitle = a.title.length > 16 ? a.title.slice(0, 16) + '...' : a.title;
+    groupArticles.slice(0, maxLeavesPerGroup).forEach((a, j) => {
+      const leafAngle = angle + (j - (leafCount - 1) / 2) * leafSpread;
+      const lx = 600 + Math.cos(leafAngle) * leafRadius;
+      const ly = 450 + Math.sin(leafAngle) * leafRadius;
+
+      const shortTitle = a.title.length > 20 ? a.title.slice(0, 20) + '...' : a.title;
       nodes.push({
         id: `leaf-${i}-${j}`,
         type: 'leafNode',
@@ -191,7 +196,7 @@ export default function GraphView({ compact = false }: GraphViewProps) {
   const legendItems = useMemo(() => {
     const skipTags = ['arxiv', 'github', 'other'];
     const groups: Record<string, string> = {};
-    const colors = ['#6366f1', '#818cf8', '#f59e0b', '#10b981', '#ec4899', '#06b6d4'];
+    const colors = ['#6366f1', '#818cf8', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#f97316', '#a78bfa'];
     articles.forEach((a) => {
       const tags: string[] = a.tags || [];
       let key = a.source_name || 'other';

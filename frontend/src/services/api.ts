@@ -106,4 +106,8 @@ export const getUsageSummary = () =>
 export const getUsageByModel = () =>
   api.get('/stats/token-usage/by-model');
 
+// Batch process: translate titles + generate summaries
+export const batchProcessArticles = (data: { translate_titles?: boolean; generate_summaries?: boolean; limit?: number }) =>
+  api.post('/articles/batch-process', data);
+
 export default api;
