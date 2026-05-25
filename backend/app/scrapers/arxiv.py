@@ -18,14 +18,13 @@ _NS = {
     "arxiv": "http://arxiv.org/schemas/atom",
 }
 
-# Search queries for relevant papers
+# Search queries — narrow to user's core interests only
 _SEARCH_QUERIES = [
     "cat:cs.CV AND (OCR OR text recognition OR document understanding)",
-    "cat:cs.AI AND (OCR OR optical character recognition OR document AI)",
-    "cat:cs.CV AND (model deployment OR inference optimization OR quantization)",
-    "cat:cs.CL AND (LLM OR large language model OR multimodal OR vision language)",
-    "cat:cs.AI AND (Ascend OR NPU OR edge inference OR model serving)",
-    "cat:cs.LG AND (transformer AND (efficient OR pruning OR distillation))",
+    "cat:cs.CV AND (Ascend OR NPU OR model deployment OR inference optimization)",
+    "cat:cs.AI AND (Ascend OR NPU OR edge inference)",
+    "cat:cs.CL AND (DeepSeek OR Qwen) AND (model OR deployment OR serving)",
+    "cat:cs.CV AND (quantization OR pruning OR distillation) AND (vision OR multimodal)",
 ]
 
 

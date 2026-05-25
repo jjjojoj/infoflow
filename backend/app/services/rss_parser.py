@@ -156,7 +156,8 @@ class RSSParser:
     @staticmethod
     def _scrapling_stealthy_sync(url: str) -> list[dict[str, Any]] | None:
         from scrapling import StealthyFetcher as _StealthyFetcher
-        resp = _StealthyFetcher.fetch(url, headless=True)
+        sf = _StealthyFetcher()
+        resp = sf.fetch(url, headless=True)
         if resp.status != 200 or not resp.body:
             return None
         body: str = resp.body

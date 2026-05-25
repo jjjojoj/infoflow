@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 from ..database import AsyncSessionLocal
 from ..models import Article, Interest, Source
 from ..scrapers.arxiv import ArxivScraper
-from ..scrapers.base import KEYWORDS
+from ..scrapers.base import KEYWORDS, CORE_KEYWORDS, BROAD_KEYWORDS
 from ..scrapers.github_trending import GitHubTrendingScraper
 from ..scrapers.huawei_ascend import HuaweiAscendScraper
 from ..scrapers.zhihu import ZhihuScraper
@@ -194,15 +194,18 @@ class CrawlerService:
                 raw_title = article_data.get("title", "") or ""
                 raw_content = article_data.get("content", "") or ""
 
-                # Stricter keyword filter:
-                # - Title match always passes (strong signal)
-                # - Content-only match requires at least 2 keyword hits
+                # Two-tier keyword filter:
+                # - Tier-1 (CORE): any ONE match → pass (strong signal)
+                # - Tier-2 (BROAD): need >=3 different matches → pass (weak alone)
                 title_lower = raw_title.lower()
                 content_lower = raw_content.lower()
-                title_hits = sum(1 for kw in KEYWORDS if kw.lower() in title_lower)
-                content_hits = sum(1 for kw in KEYWORDS if kw.lower() in content_lower and kw.lower() not in title_lower)
-                if title_hits == 0 and content_hits < 2:
-                    continue
+                all_text = f"{title_lower} {content_lower}"
+
+                core_hit = any(kw.lower() in all_text for kw in CORE_KEYWORDS)
+                if not core_hit:
+                    broad_hits = sum(1 for kw in BROAD_KEYWORDS if kw.lower() in all_text)
+                    if broad_hits < 3:
+                        continue
 
                 # Run dedup check
                 is_dup = await dedup_engine.is_duplicate(article_data, session)

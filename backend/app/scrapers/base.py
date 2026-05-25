@@ -7,28 +7,36 @@ from datetime import datetime
 from typing import Any
 
 
-# Predefined keywords for filtering relevant content
-KEYWORDS = [
-    # 核心技术
+# Tier-1 keywords: strong signal, any ONE match = relevant
+CORE_KEYWORDS = [
+    # OCR / 文档AI
     "OCR", "文字识别", "optical character recognition", "document AI",
     "text recognition", "document understanding",
-    # 信创/国产化
-    "昇腾", "鲲鹏", "信创", "CANN", "MindSpore", "国产化",
-    "ascend", "huawei ai", "npu",
-    # AI框架与部署
-    "PaddleOCR", "paddleocr", "模型部署", "inference", "onnx",
-    "tensorrt", "量化", "quantiz", "蒸馏", "distill",
-    # 深度学习
-    "深度学习", "deep learning", "transformer", "大模型", "LLM",
-    "多模态", "multimodal", "计算机视觉", "computer vision",
-    "目标检测", "object detection", "图像分割", "segmentation",
-    # 工具与框架
-    "PyTorch", "pytorch", "Qwen", "DeepSeek", "Yi",
-    "Stable Diffusion", "diffusion", "GAN",
-    # AI 应用
-    "RAG", "agent", "fine-tun", "微调", "训练", "train",
-    "embedding", "向量数据库", "vector database",
+    # 信创 / 昇腾 / NPU
+    "昇腾", "鲲鹏", "信创", "CANN", "MindSpore", "国产化", "国产芯片",
+    "ascend", "npu", "huawei ai",
+    # OCR 具体工具
+    "PaddleOCR", "paddleocr",
+    # 模型部署 / 推理优化
+    "模型部署", "onnx", "tensorrt", "模型量化",
+    "inference optimization", "edge inference",
 ]
+
+# Tier-2 keywords: weak signal alone, need >=2 different matches OR paired with tier-1
+BROAD_KEYWORDS = [
+    # 大模型
+    "DeepSeek", "Qwen", "大模型", "LLM",
+    # CV
+    "计算机视觉", "computer vision", "目标检测", "object detection",
+    "图像分割", "segmentation", "多模态", "multimodal",
+    # 通用AI
+    "PyTorch", "pytorch", "transformer", "量化", "quantiz",
+    "蒸馏", "distill", "RAG", "agent", "微调", "fine-tun",
+    "向量数据库", "vector database", "embedding",
+]
+
+# Combined list (for backward compat)
+KEYWORDS = CORE_KEYWORDS + BROAD_KEYWORDS
 
 
 @dataclass
