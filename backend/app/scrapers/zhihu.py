@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
+import feedparser
 import httpx
 
 from .base import BaseScraper, RawArticle
@@ -22,7 +23,7 @@ class ZhihuScraper(BaseScraper):
     source_type = "crawler"
 
     def __init__(self) -> None:
-        self._search_url = "https://www.zhihu.com/api/v4/search_v3"
+        self._rss_url = "https://www.zhihu.com/rss"
         self._hot_url = "https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total"
         self._headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -32,97 +33,58 @@ class ZhihuScraper(BaseScraper):
         }
 
     async def fetch(self, **kwargs: Any) -> list[dict[str, Any]]:
-        """Fetch Zhihu content related to target keywords.
-
-        Attempts StealthyFetcher first, falls back to httpx search API.
-        """
-        articles = await self._fetch_via_stealthy()
+        """Fetch Zhihu content related to target keywords via public endpoints."""
+        articles = await self._fetch_via_rss()
         if articles:
             return articles
 
-        # Fallback: use httpx to call Zhihu search API
         return await self._fetch_via_httpx()
 
-    async def _fetch_via_stealthy(self) -> list[dict[str, Any]]:
-        """Try fetching Zhihu hot list using StealthyFetcher."""
+    async def _fetch_via_rss(self) -> list[dict[str, Any]]:
+        """Fetch Zhihu's public RSS feed and filter it locally."""
         try:
-            from scrapling import StealthyFetcher
-
-            fetcher = StealthyFetcher()
-            all_articles: list[dict[str, Any]] = []
-
-            for keyword in _SEARCH_KEYWORDS[:3]:  # Limit to avoid rate limiting
-                try:
-                    url = f"https://www.zhihu.com/search?type=content&q={keyword}"
-                    response = fetcher.get(url)
-                    if response and response.status == 200:
-                        parsed = self._parse_search_html(response.text, keyword)
-                        all_articles.extend(parsed)
-                except Exception as e:
-                    logger.debug("StealthyFetcher failed for keyword '%s': %s", keyword, e)
-                    continue
-
-            if all_articles:
-                logger.info("Zhihu (StealthyFetcher): found %d articles", len(all_articles))
-            return all_articles
-
-        except ImportError:
-            logger.info("StealthyFetcher not available, using httpx fallback")
-            return []
+            async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                resp = await client.get(self._rss_url, headers=self._headers)
+                resp.raise_for_status()
+            return self._parse_feed(resp.content)
         except Exception as e:
-            logger.warning("StealthyFetcher error: %s", e)
+            logger.warning("Zhihu RSS fetch failed: %s", e)
             return []
 
-    def _parse_search_html(self, html: str, keyword: str) -> list[dict[str, Any]]:
-        """Parse Zhihu search results HTML page."""
-        try:
-            from selectolax.parser import HTMLParser
-        except ImportError:
-            return []
-
-        tree = HTMLParser(html)
+    def _parse_feed(self, raw_data: bytes | str) -> list[dict[str, Any]]:
+        """Parse RSS/Atom data into article dicts."""
+        feed = feedparser.parse(raw_data)
         articles: list[dict[str, Any]] = []
 
-        # Try to find search result cards
-        for card in tree.css(".SearchResult-Card, .ContentItem"):
+        for entry in feed.entries[:50]:
             try:
-                title_el = card.css_first("h2, .ContentItem-title a")
-                if not title_el:
-                    continue
-                title = title_el.text(strip=True)
+                title = (entry.get("title") or "").strip()
                 if not title:
                     continue
-
-                # Get link
-                link_el = card.css_first("a[href*='/question/'], a[href*='/p/']")
-                if link_el:
-                    href = link_el.attributes.get("href", "")
-                    if href.startswith("//"):
-                        href = "https:" + href
-                    elif not href.startswith("http"):
-                        href = "https://www.zhihu.com" + href
-                else:
-                    href = f"https://www.zhihu.com/search?type=content&q={keyword}"
-
-                # Get summary
-                summary_el = card.css_first(".RichContent-inner, .content")
-                summary = summary_el.text(strip=True)[:200] if summary_el else ""
+                summary = entry.get("summary", "") or entry.get("description", "")
+                combined = f"{title} {summary}"
+                if not self.matches_keywords(combined, _SEARCH_KEYWORDS):
+                    continue
+                href = entry.get("link", "")
+                if not href:
+                    continue
 
                 article = RawArticle(
-                    title=f"[知乎] {title}",
+                    title=f"【知乎】{title}",
                     url=href,
                     content=summary,
                     source_name=self.name,
                     source_type=self.source_type,
-                    tags=["zhihu", keyword],
+                    tags=["zhihu"],
                     published_at=datetime.utcnow(),
                 )
                 articles.append(article.to_dict())
 
             except Exception as e:
-                logger.debug("Error parsing Zhihu card: %s", e)
+                logger.debug("Error parsing Zhihu RSS entry: %s", e)
                 continue
 
+        logger.info("Zhihu RSS: found %d articles", len(articles))
         return articles
 
     async def _fetch_via_httpx(self) -> list[dict[str, Any]]:
@@ -173,6 +135,6 @@ class ZhihuScraper(BaseScraper):
 
     async def parse(self, raw_data: Any) -> list[dict[str, Any]]:
         """Parse raw Zhihu data."""
-        if isinstance(raw_data, str):
-            return self._parse_search_html(raw_data, "")
+        if isinstance(raw_data, (str, bytes)):
+            return self._parse_feed(raw_data)
         return []

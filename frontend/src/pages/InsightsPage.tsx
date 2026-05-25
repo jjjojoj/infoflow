@@ -1,35 +1,69 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lightbulb, FileText, Clock, ChevronRight, Loader2 } from 'lucide-react';
+import { Lightbulb, FileText, Clock, ChevronRight, Loader2, Search } from 'lucide-react';
 import { getArticles } from '../services/api';
+import { getInterests } from '../services/api';
 import type { Article } from '../types';
+import type { Interest } from '../types';
+import { formatSourceName, formatSourceType } from '../utils/sourceDisplay';
+
+const PAGE_SIZE = 20;
 
 const sourceTypeColors: Record<string, string> = {
-  arxiv: '#6366f1',
-  github: '#818cf8',
-  zhihu: '#f59e0b',
-  huawei_ascend: '#10b981',
-  rss: '#ec4899',
+  arxiv: '#6366f1', crawler: '#6366f1',
+  github_trending: '#818cf8', github: '#818cf8',
+  zhihu: '#f59e0b', huawei_ascend: '#10b981', rss: '#ec4899',
 };
 
 export default function InsightsPage() {
   const navigate = useNavigate();
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [allArticles, setAllArticles] = useState<Article[]>([]);
+  const [interests, setInterests] = useState<Interest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeInterest, setActiveInterest] = useState<string>('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await getArticles({ limit: 50 });
-        setArticles(res.data.items ?? []);
+        const [articlesRes, interestsRes] = await Promise.all([
+          getArticles({ limit: 500, skip: 0 }),
+          getInterests(),
+        ]);
+        setAllArticles(articlesRes.data.items ?? []);
+        const interestData = interestsRes.data as any;
+        setInterests(interestData?.items ?? (Array.isArray(interestData) ? interestData : []));
       } catch (err) {
-        console.error('Failed to fetch articles for insights:', err);
+        console.error('Failed to fetch data:', err);
       } finally {
         setLoading(false);
       }
     }
     fetchData();
   }, []);
+
+  // Filter articles
+  const filtered = allArticles.filter(a => {
+    // Search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!a.title.toLowerCase().includes(q) && !(a.summary || '').toLowerCase().includes(q)) {
+        return false;
+      }
+    }
+    // Interest keyword filter
+    if (activeInterest !== 'all') {
+      const kw = activeInterest.toLowerCase();
+      const text = `${a.title} ${a.content || ''} ${(a.tags || []).join(' ')}`.toLowerCase();
+      if (!text.includes(kw)) return false;
+    }
+    return true;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -40,33 +74,63 @@ export default function InsightsPage() {
   }
 
   return (
-    <section className="p-6 space-y-6">
+    <section className="p-6 space-y-5">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-[#f1f5f9]">我的洞察</h1>
-          <p className="mt-1 text-sm text-[#64748b]">基于 AI 分析生成的深度洞察报告</p>
+          <p className="mt-1 text-sm text-[#64748b]">共 {filtered.length} 篇文章</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 rounded-full bg-[#6366f1]/10 px-3 py-1.5 text-xs text-[#818cf8]">
-            <Lightbulb size={12} />
-            共 {articles.length} 篇文章
-          </span>
+        {/* Search */}
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748b]" />
+          <input
+            type="text"
+            placeholder="搜索标题或摘要..."
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            className="h-9 w-56 rounded-lg border border-[#2d3748] bg-[#1a2332] pl-9 pr-3 text-sm text-[#f1f5f9] placeholder-[#64748b] outline-none focus:border-[#6366f1]"
+          />
         </div>
       </div>
 
-      {/* Insight Cards Grid */}
+      {/* Interest filter tabs */}
+      {interests.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => { setActiveInterest('all'); setPage(1); }}
+            className={`rounded-full px-3 py-1 text-xs transition ${activeInterest === 'all'
+              ? 'bg-[#6366f1] text-white'
+              : 'bg-[#1e2d3d] text-[#94a3b8] hover:text-white'}`}
+          >
+            全部
+          </button>
+          {interests.filter(i => i.enabled).map(i => (
+            <button
+              key={i.id}
+              onClick={() => { setActiveInterest(i.keyword); setPage(1); }}
+              className={`rounded-full px-3 py-1 text-xs transition ${activeInterest === i.keyword
+                ? 'bg-[#6366f1] text-white'
+                : 'bg-[#1e2d3d] text-[#94a3b8] hover:text-white'}`}
+            >
+              {i.keyword}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Article Cards */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {articles.map((article) => {
+        {paged.map((article) => {
           const color = sourceTypeColors[article.source_type || ''] || '#6366f1';
-          const category = article.source_type || article.source_name || '其他';
+          const category = article.fetch_method
+            || (article.source_type === 'rss' ? '网页采集' : formatSourceType(article.source_name || article.source_type));
           return (
             <div
               key={article.id}
               onClick={() => navigate(`/articles/${article.id}`)}
               className="group cursor-pointer rounded-xl border border-[#2d3748] bg-[#1a2332] p-5 transition-all hover:border-[#6366f1]/40 hover:shadow-lg hover:shadow-[#6366f1]/5"
             >
-              {/* Category Tag */}
               <div className="mb-3 flex items-center justify-between">
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
@@ -78,17 +142,14 @@ export default function InsightsPage() {
                 <ChevronRight size={14} className="text-[#64748b] opacity-0 transition-opacity group-hover:opacity-100" />
               </div>
 
-              {/* Title */}
-              <h3 className="text-sm font-semibold text-[#f1f5f9] group-hover:text-[#818cf8] transition-colors">
+              <h3 className="text-sm font-semibold text-[#f1f5f9] group-hover:text-[#818cf8] transition-colors line-clamp-2">
                 {article.title}
               </h3>
 
-              {/* Summary */}
               <p className="mt-2 text-xs leading-relaxed text-[#94a3b8] line-clamp-2">
                 {article.summary || '暂无摘要'}
               </p>
 
-              {/* Meta */}
               <div className="mt-4 flex items-center gap-4 text-[11px] text-[#64748b]">
                 <span className="flex items-center gap-1">
                   <Clock size={11} />
@@ -96,21 +157,46 @@ export default function InsightsPage() {
                 </span>
                 <span className="flex items-center gap-1">
                   <FileText size={11} />
-                  {article.source_name || '未知来源'}
+                  {formatSourceName(article.source_name)}
                 </span>
-                <span className="flex items-center gap-1">
-                  <Lightbulb size={11} />
-                  相关度 {Math.round(article.relevance_score * 100)}%
-                </span>
+                {article.relevance_score > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Lightbulb size={11} />
+                    {Math.round(article.relevance_score * 100)}%
+                  </span>
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      {articles.length === 0 && (
+      {filtered.length === 0 && (
         <div className="py-12 text-center text-sm text-[#64748b]">
-          暂无文章数据，请先添加信息源并采集文章
+          {searchQuery || activeInterest !== 'all' ? '没有匹配的文章' : '暂无文章数据，请先添加信息源并采集文章'}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="rounded-lg border border-[#2d3748] px-3 py-1.5 text-xs text-[#94a3b8] hover:bg-[#1e2d3d] disabled:opacity-30"
+          >
+            上一页
+          </button>
+          <span className="text-xs text-[#64748b]">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="rounded-lg border border-[#2d3748] px-3 py-1.5 text-xs text-[#94a3b8] hover:bg-[#1e2d3d] disabled:opacity-30"
+          >
+            下一页
+          </button>
         </div>
       )}
     </section>

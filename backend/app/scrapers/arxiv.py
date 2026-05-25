@@ -22,7 +22,10 @@ _NS = {
 _SEARCH_QUERIES = [
     "cat:cs.CV AND (OCR OR text recognition OR document understanding)",
     "cat:cs.AI AND (OCR OR optical character recognition OR document AI)",
-    "cat:cs.CV AND (model deployment OR inference optimization)",
+    "cat:cs.CV AND (model deployment OR inference optimization OR quantization)",
+    "cat:cs.CL AND (LLM OR large language model OR multimodal OR vision language)",
+    "cat:cs.AI AND (Ascend OR NPU OR edge inference OR model serving)",
+    "cat:cs.LG AND (transformer AND (efficient OR pruning OR distillation))",
 ]
 
 

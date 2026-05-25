@@ -62,18 +62,29 @@ class DashScopeLLM(BaseLLM):
             return LLMResponse(content="", model=self.model, usage={})
 
     async def summarize(self, text: str, max_length: int = 200) -> str:
-        """生成文本摘要。"""
+        """生成结构化 Markdown 摘要。"""
         messages = [
             {
                 "role": "system",
-                "content": "你是一个专业的文本摘要助手，擅长提取核心要点并生成简洁的摘要。",
+                "content": (
+                    "你是一个专业的技术内容摘要助手。"
+                    "请用 Markdown 格式输出摘要，结构清晰，包含以下层级：\n"
+                    "### 核心要点\n- 用 2-3 个 bullet 列出最重要的信息\n"
+                    "### 技术细节\n- 列出关键技术点或方法（如有）\n"
+                    "### 影响与趋势\n- 一句话总结行业影响或发展趋势\n\n"
+                    "规则：\n"
+                    "- 每个 bullet 不超过 40 字\n"
+                    "- 不要使用加粗/斜体等额外格式\n"
+                    "- 如果内容不涉及某部分，可以省略该标题\n"
+                    "- 总字数控制在 300 字以内"
+                ),
             },
             {
                 "role": "user",
-                "content": f"请用不超过{max_length}字总结以下内容的核心要点，直接给出摘要内容：\n\n{text}",
+                "content": f"请生成以下内容的结构化摘要：\n\n{text}",
             },
         ]
-        resp = await self.chat(messages, temperature=0.3, max_tokens=500)
+        resp = await self.chat(messages, temperature=0.3, max_tokens=600)
         return resp.content.strip()
 
     async def extract_keywords(self, text: str, max_keywords: int = 10) -> list[str]:

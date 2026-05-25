@@ -5,6 +5,7 @@ the FastAPI lifespan handler.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -28,12 +29,15 @@ class SchedulerService:
 
         # Register the periodic crawl job
         self._scheduler.add_job(
-            self._run_fetch_job,
+            self._run_fetch_job_with_timeout,
             "interval",
             minutes=settings.FETCH_INTERVAL_MINUTES,
             id="fetch_all_sources",
             name="Fetch all sources",
             replace_existing=True,
+            misfire_grace_time=300,
+            max_instances=1,
+            coalesce=True,
         )
 
         self._scheduler.start()
@@ -70,7 +74,15 @@ class SchedulerService:
 
         Calls CrawlerService.run_all() and returns new article count.
         """
-        return await self._run_fetch_job()
+        return await self._run_fetch_job_with_timeout()
+
+    async def _run_fetch_job_with_timeout(self) -> int:
+        """Execute the crawl job with an overall defensive timeout."""
+        try:
+            return await asyncio.wait_for(self._run_fetch_job(), timeout=1200)
+        except asyncio.TimeoutError:
+            logger.exception("Scheduler: fetch job timed out")
+            return 0
 
     async def _run_fetch_job(self) -> int:
         """Internal: execute the crawl job."""
@@ -83,7 +95,7 @@ class SchedulerService:
             logger.info("Scheduler: fetch job complete. %d new articles.", new_count)
             return new_count
         except Exception as e:
-            logger.error("Scheduler: fetch job failed: %s", e)
+            logger.exception("Scheduler: fetch job failed: %s", e)
             return 0
 
 

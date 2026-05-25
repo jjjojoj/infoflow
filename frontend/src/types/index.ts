@@ -14,10 +14,11 @@ export interface Article {
   is_bookmarked: boolean;
   relevance_score: number;
   content_hash?: string | null;
+  fetch_method?: string | null;
   community?: string | null;
 }
 
-export type SourceType = 'rss' | 'github' | 'arxiv' | 'zhihu' | 'huawei_ascend' | 'custom';
+export type SourceType = 'rss' | 'crawler' | 'github' | 'github_trending' | 'arxiv' | 'zhihu' | 'huawei_ascend' | 'custom';
 
 export interface Source {
   id: number;
@@ -75,29 +76,38 @@ export interface DashboardStats {
 }
 
 export interface Settings {
-  llm_provider: 'deepseek' | 'openai' | 'ollama';
-  llm_model: string;
-  llm_api_key: string;
-  llm_base_url: string;
-  llm_temperature: number;
-  llm_max_tokens: number;
-  fetch_interval: number;
-  fetch_mode: 'continuous' | 'scheduled';
+  llm_provider?: 'deepseek' | 'openai' | 'ollama' | 'dashscope';
+  llm_model?: string;
+  llm_api_key?: string;
+  llm_base_url?: string;
+  llm_temperature?: number;
+  llm_max_tokens?: number;
+  fetch_interval?: number;
+  fetch_mode?: 'continuous' | 'scheduled';
   fetch_start_hour?: number;
   fetch_end_hour?: number;
-  scheduler_running: boolean;
-  obsidian_vault_path: string;
-  auto_export: boolean;
-  export_interval: number;
-  deep_mode: boolean;
-  theme: 'dark' | 'light';
-  language: 'zh' | 'en';
+  scheduler_running?: boolean;
+  obsidian_vault_path?: string;
+  auto_export?: boolean;
+  export_interval?: number;
+  deep_mode?: boolean;
+  theme?: 'dark' | 'light';
+  language?: 'zh' | 'en';
+  // Per-provider API keys (for LLM settings page)
+  deepseek_api_key?: string;
+  openai_api_key?: string;
+  dashscope_api_key?: string;
+  ollama_base_url?: string;
+  ollama_model?: string;
+  temperature?: number;
+  max_tokens?: number;
 }
 
 export interface CreateSourceData {
   name: string;
   url: string;
   source_type: SourceType;
+  enabled?: boolean;
   fetch_interval?: number;
   config?: Record<string, unknown>;
 }

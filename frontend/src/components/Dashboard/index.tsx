@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { FileText, Eye, Lightbulb, Radio } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getArticles, getSources } from '../../services/api';
 import type { Article, DashboardStats } from '../../types';
 import TrendChart from './TrendChart';
+import { formatSourceName } from '../../utils/sourceDisplay';
 
 const defaultStats: DashboardStats = {
   new_articles: 0,
@@ -37,15 +38,19 @@ const tagColors: Record<string, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [stats, setStats] = useState<DashboardStats>(defaultStats);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const keyword = searchParams.get('keyword') || '';
 
   useEffect(() => {
     async function fetchData() {
       try {
+        const params: Record<string, any> = { limit: 10 };
+        if (keyword) params.keyword = keyword;
         const [articlesRes, sourcesRes] = await Promise.all([
-          getArticles({ limit: 10 }),
+          getArticles(params),
           getSources(),
         ]);
         const items = articlesRes.data.items ?? [];
@@ -67,7 +72,7 @@ export default function Dashboard() {
       }
     }
     fetchData();
-  }, []);
+  }, [keyword]);
 
   return (
     <section className="p-6 space-y-6">
@@ -102,7 +107,9 @@ export default function Dashboard() {
       {/* Article List */}
       <div>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">最新文章</h2>
+          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            {keyword ? `搜索"${keyword}"的结果` : '最新文章'}
+          </h2>
           <span className="text-sm text-[var(--color-text-muted)]">共 {stats.new_articles} 篇</span>
         </div>
         {loading ? (
@@ -159,7 +166,7 @@ export default function Dashboard() {
                   <span className="text-xs text-[var(--color-text-muted)]">
                     {new Date(article.created_at).toLocaleDateString('zh-CN')}
                   </span>
-                  <span className="text-[11px] text-[var(--color-text-muted)]">{article.source_name}</span>
+                  <span className="text-[11px] text-[var(--color-text-muted)]">{formatSourceName(article.source_name)}</span>
                 </div>
               </div>
             ))}

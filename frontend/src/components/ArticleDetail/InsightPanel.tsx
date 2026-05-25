@@ -1,5 +1,6 @@
 import { X, ExternalLink, BookmarkPlus, FileText } from 'lucide-react';
 import type { Article } from '../../types';
+import { formatSourceName } from '../../utils/sourceDisplay';
 
 interface InsightPanelProps {
   articleId: string;
@@ -87,7 +88,7 @@ export default function InsightPanel({ article: art, onClose }: InsightPanelProp
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm">📄</span>
-                <span className="text-sm text-[var(--color-text-primary)]">{art.source_name || '原文'}</span>
+                <span className="text-sm text-[var(--color-text-primary)]">{formatSourceName(art.source_name)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[var(--color-text-muted)]">{timeAgo}</span>

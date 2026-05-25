@@ -6,7 +6,6 @@ import {
   Lightbulb,
   Bookmark,
   Settings as SettingsIcon,
-  Plus,
   Loader2,
 } from 'lucide-react';
 import { getArticles } from '../../services/api';
@@ -22,6 +21,8 @@ const navItems = [
 
 const sourceTypeColors: Record<string, string> = {
   arxiv: '#6366f1',
+  crawler: '#6366f1',
+  github_trending: '#818cf8',
   github: '#818cf8',
   zhihu: '#f59e0b',
   huawei_ascend: '#10b981',
@@ -74,14 +75,6 @@ export default function Sidebar() {
         <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
           AI 信息洞察与知识网络
         </div>
-      </div>
-
-      {/* New Insight Button */}
-      <div className="px-4 pb-4">
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-accent-light)]">
-          <Plus size={16} />
-          <span>新建洞察</span>
-        </button>
       </div>
 
       {/* Navigation */}

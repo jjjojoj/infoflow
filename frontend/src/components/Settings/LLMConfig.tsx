@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Wifi, WifiOff, Loader2, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Wifi, WifiOff, Loader2, Eye, EyeOff, Save } from 'lucide-react';
+import { testLLMConnection, getSettings, updateSettings } from '../../services/api';
 
 type LLMProvider = 'deepseek' | 'openai' | 'ollama' | 'dashscope';
 
@@ -21,7 +22,7 @@ export default function LLMConfig() {
     deepseek_api_key: '',
     openai_api_key: '',
     openai_model: 'gpt-4o-mini',
-    dashscope_api_key: 'sk-*********************',
+    dashscope_api_key: '',
     ollama_base_url: 'http://localhost:11434',
     ollama_model: 'qwen2.5:7b',
     temperature: 0.7,
@@ -29,16 +30,74 @@ export default function LLMConfig() {
   });
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
-  const handleTest = () => {
+  // Load current LLM settings from backend
+  useEffect(() => {
+    getSettings().then(res => {
+      const s = res.data as any;
+      if (s.llm_provider) setForm(f => ({ ...f, provider: s.llm_provider }));
+      if (s.deepseek_api_key) setForm(f => ({ ...f, deepseek_api_key: s.deepseek_api_key }));
+      if (s.openai_api_key) setForm(f => ({ ...f, openai_api_key: s.openai_api_key }));
+      if (s.dashscope_api_key) setForm(f => ({ ...f, dashscope_api_key: s.dashscope_api_key }));
+      if (s.temperature != null) setForm(f => ({ ...f, temperature: s.temperature }));
+      if (s.max_tokens != null) setForm(f => ({ ...f, max_tokens: s.max_tokens }));
+    }).catch(() => {});
+  }, []);
+
+  const handleTest = async () => {
+    // First save the config, then test
     setTesting(true);
     setTestResult(null);
-    setTimeout(() => {
+    try {
+      await updateSettings({
+        llm_provider: form.provider,
+        deepseek_api_key: form.deepseek_api_key,
+        openai_api_key: form.openai_api_key,
+        dashscope_api_key: form.dashscope_api_key,
+        ollama_base_url: form.ollama_base_url,
+        ollama_model: form.ollama_model,
+        temperature: form.temperature,
+        max_tokens: form.max_tokens,
+      });
+      const res = await testLLMConnection();
+      const data = res.data as any;
+      if (data.success) {
+        setTestResult({ ok: true, msg: `连接成功 (${data.model || ''})` });
+      } else {
+        setTestResult({ ok: false, msg: data.error || '连接失败' });
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || '网络错误';
+      setTestResult({ ok: false, msg });
+    } finally {
       setTesting(false);
-      setTestResult('success');
-    }, 1500);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      await updateSettings({
+        llm_provider: form.provider,
+        deepseek_api_key: form.deepseek_api_key,
+        openai_api_key: form.openai_api_key,
+        dashscope_api_key: form.dashscope_api_key,
+        ollama_base_url: form.ollama_base_url,
+        ollama_model: form.ollama_model,
+        temperature: form.temperature,
+        max_tokens: form.max_tokens,
+      });
+      setSaveMsg('已保存');
+    } catch (err) {
+      setSaveMsg('保存失败');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const providers: { key: LLMProvider; label: string; desc: string }[] = [
@@ -169,14 +228,10 @@ export default function LLMConfig() {
             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
             测试连接
           </button>
-          {testResult === 'success' && (
-            <span className="flex items-center gap-1 text-sm text-[var(--color-success)]">
-              <Wifi className="h-4 w-4" /> 连接成功
-            </span>
-          )}
-          {testResult === 'error' && (
-            <span className="flex items-center gap-1 text-sm text-[var(--color-danger)]">
-              <WifiOff className="h-4 w-4" /> 连接失败
+          {testResult && (
+            <span className={`flex items-center gap-1 text-sm ${testResult.ok ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
+              {testResult.ok ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+              {testResult.msg}
             </span>
           )}
         </div>
@@ -224,9 +279,16 @@ export default function LLMConfig() {
       </div>
 
       {/* Save */}
-      <div className="flex justify-end gap-2">
-        <button className="rounded-lg border border-[#374151] px-4 py-2 text-sm text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-elevated)]">取消</button>
-        <button className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--color-accent-light)]">保存配置</button>
+      <div className="flex items-center justify-end gap-3">
+        {saveMsg && <span className="text-sm text-[var(--color-text-muted)]">{saveMsg}</span>}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--color-accent-light)] disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          保存配置
+        </button>
       </div>
     </div>
   );
