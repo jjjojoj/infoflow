@@ -193,8 +193,15 @@ class CrawlerService:
             try:
                 raw_title = article_data.get("title", "") or ""
                 raw_content = article_data.get("content", "") or ""
-                filter_text = f"{raw_title} {raw_content}"
-                if not any(kw.lower() in filter_text.lower() for kw in KEYWORDS):
+
+                # Stricter keyword filter:
+                # - Title match always passes (strong signal)
+                # - Content-only match requires at least 2 keyword hits
+                title_lower = raw_title.lower()
+                content_lower = raw_content.lower()
+                title_hits = sum(1 for kw in KEYWORDS if kw.lower() in title_lower)
+                content_hits = sum(1 for kw in KEYWORDS if kw.lower() in content_lower and kw.lower() not in title_lower)
+                if title_hits == 0 and content_hits < 2:
                     continue
 
                 # Run dedup check

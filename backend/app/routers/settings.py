@@ -1,7 +1,9 @@
-"""Settings router - read/update interest keywords and runtime preferences."""
+"""Settings router - read/update settings, interests CRUD, LLM test."""
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,11 +14,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_session
 from ..models import Article, Source, Interest
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+# Persistent settings file path (inside Docker container)
+_SETTINGS_FILE = "/app/data/settings.json"
+
+
+def _read_settings_file() -> dict:
+    """Read settings from JSON file, return empty dict if not found."""
+    try:
+        if os.path.exists(_SETTINGS_FILE):
+            with open(_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning("Failed to read settings file: %s", e)
+    return {}
+
+
+def _write_settings_file(data: dict) -> None:
+    """Write settings to JSON file."""
+    os.makedirs(os.path.dirname(_SETTINGS_FILE), exist_ok=True)
+    with open(_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 # ---------------------------------------------------------------------------
-# Pydantic schemas for interests
+# Pydantic schemas
 # ---------------------------------------------------------------------------
 
 class InterestCreate(BaseModel):
@@ -48,18 +72,36 @@ class InterestResponse(BaseModel):
 
 @router.get("")
 async def get_settings() -> dict:
-    """Return current settings (interests, llm provider, intervals). TODO."""
-    return {
-        "llm_provider": None,
-        "fetch_interval_minutes": None,
-        "interests": [],
-    }
+    """Return current persisted settings."""
+    return _read_settings_file()
 
 
 @router.put("")
 async def update_settings(payload: dict) -> dict:
-    """Update settings. TODO: implement persistence."""
-    return {"updated": True, **payload}
+    """Update settings. Merge with existing and persist to disk."""
+    current = _read_settings_file()
+    current.update(payload)
+    _write_settings_file(current)
+
+    # If LLM provider changed, update env vars at runtime so get_llm_provider picks it up
+    if "llm_provider" in payload:
+        os.environ["LLM_PROVIDER"] = payload["llm_provider"]
+    if "deepseek_api_key" in payload:
+        os.environ["DEEPSEEK_API_KEY"] = payload["deepseek_api_key"]
+    if "openai_api_key" in payload:
+        os.environ["OPENAI_API_KEY"] = payload["openai_api_key"]
+    if "dashscope_api_key" in payload:
+        os.environ["DASHSCOPE_API_KEY"] = payload["dashscope_api_key"]
+    if "ollama_base_url" in payload:
+        os.environ["OLLAMA_BASE_URL"] = payload["ollama_base_url"]
+    if "ollama_model" in payload:
+        os.environ["OLLAMA_MODEL"] = payload["ollama_model"]
+
+    # Clear lru_cache so next get_settings() picks up new env vars
+    from ..config import get_settings as _cached_get_settings
+    _cached_get_settings.cache_clear()
+
+    return {"updated": True, **current}
 
 
 @router.get("/dashboard")
@@ -77,7 +119,6 @@ async def dashboard_stats(session: AsyncSession = Depends(get_session)) -> dict:
         select(func.count(Source.id)).where(Source.enabled == True)  # noqa: E712
     )).scalar() or 0
 
-    # Insights count (articles with summary)
     insights = (await session.execute(
         select(func.count(Article.id)).where(Article.summary.isnot(None))
     )).scalar() or 0
@@ -197,14 +238,13 @@ async def generate_interests_from_description(payload: dict, session: AsyncSessi
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Invalid JSON from LLM")
 
-    # Upsert interest records (update existing, create new)
+    # Upsert interest records
     created = []
     updated = 0
     for item in items:
         kw = item.get("keyword", "").strip()
         if not kw:
             continue
-        # Check if keyword already exists
         existing_stmt = select(Interest).where(Interest.keyword == kw)
         existing_result = await session.execute(existing_stmt)
         existing = existing_result.scalar_one_or_none()

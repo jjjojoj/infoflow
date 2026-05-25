@@ -102,36 +102,52 @@ class BaseLLM(ABC):
             logger.warning("Failed to record LLM usage: %s", exc)
 
 
+def _load_runtime_settings() -> dict:
+    """Load settings from the persistent JSON file (written by settings router)."""
+    import json, os
+    try:
+        path = "/app/data/settings.json"
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
 def get_llm_provider(provider: str | None = None) -> BaseLLM:
     """工厂函数，根据配置返回对应 LLM 实例。
 
-    Parameters
-    ----------
-    provider : str | None
-        强制指定 provider 名称。为 None 时从 settings.LLM_PROVIDER 读取。
+    优先从 settings.json（用户在前端配置的）读取，回退到环境变量。
     """
     from ...config import settings
 
-    chosen = provider or settings.LLM_PROVIDER
+    rt = _load_runtime_settings()
+    chosen = provider or rt.get("llm_provider") or settings.LLM_PROVIDER
 
     if chosen == "deepseek":
         from .deepseek import DeepSeekLLM
-
-        return DeepSeekLLM(api_key=settings.DEEPSEEK_API_KEY)
+        key = rt.get("deepseek_api_key") or settings.DEEPSEEK_API_KEY
+        if not key:
+            raise ValueError("DeepSeek API Key 未配置，请在设置页面填写")
+        return DeepSeekLLM(api_key=key)
     elif chosen == "openai":
         from .openai_adapter import OpenAILLM
-
-        return OpenAILLM(api_key=settings.OPENAI_API_KEY)
+        key = rt.get("openai_api_key") or settings.OPENAI_API_KEY
+        if not key:
+            raise ValueError("OpenAI API Key 未配置，请在设置页面填写")
+        return OpenAILLM(api_key=key)
     elif chosen == "ollama":
         from .ollama import OllamaLLM
-
         return OllamaLLM(
-            base_url=settings.OLLAMA_BASE_URL,
-            model=settings.OLLAMA_MODEL,
+            base_url=rt.get("ollama_base_url") or settings.OLLAMA_BASE_URL,
+            model=rt.get("ollama_model") or settings.OLLAMA_MODEL,
         )
     elif chosen == "dashscope":
         from .dashscope import DashScopeLLM
-
-        return DashScopeLLM(api_key=settings.DASHSCOPE_API_KEY)
+        key = rt.get("dashscope_api_key") or settings.DASHSCOPE_API_KEY
+        if not key:
+            raise ValueError("DashScope API Key 未配置，请在设置页面填写")
+        return DashScopeLLM(api_key=key)
     else:
         raise ValueError(f"不支持的 LLM provider: {chosen}，可选: deepseek, openai, ollama, dashscope")
