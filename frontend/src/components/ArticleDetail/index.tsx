@@ -4,6 +4,7 @@ import { ExternalLink, Bookmark, Clock, Tag } from 'lucide-react';
 import { getArticle, bookmarkArticle } from '../../services/api';
 import type { Article } from '../../types';
 import { formatSourceName } from '../../utils/sourceDisplay';
+import MarkdownRenderer from '../common/MarkdownRenderer';
 
 export default function ArticleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -95,9 +96,13 @@ export default function ArticleDetail() {
       {/* Summary */}
       <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
         <h3 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">AI 摘要</h3>
-        <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-          {article.summary || '暂无摘要'}
-        </p>
+        <MarkdownRenderer
+          content={article.summary || ''}
+          className="text-sm leading-relaxed text-[var(--color-text-secondary)]"
+        />
+        {!article.summary && (
+          <p className="text-sm text-[var(--color-text-muted)]">暂无摘要</p>
+        )}
       </div>
 
       {/* Tags */}

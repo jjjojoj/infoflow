@@ -14,6 +14,7 @@ export interface Article {
   is_bookmarked: boolean;
   relevance_score: number;
   content_hash?: string | null;
+  fetch_method?: string | null;
   community?: string | null;
 }
 

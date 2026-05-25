@@ -35,6 +35,7 @@ class ArticleResponse(BaseModel):
     is_read: bool = False
     is_bookmarked: bool = False
     relevance_score: float = 0.0
+    fetch_method: str | None = None
     community: str | None = None
 
     model_config = {"from_attributes": True}
@@ -62,7 +63,7 @@ DISPLAY_NAMES = {
 @router.get("")
 async def list_articles(
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=200),
+    limit: int = Query(20, ge=1, le=1000),
     source: str | None = None,
     tag: str | None = None,
     keyword: str | None = None,

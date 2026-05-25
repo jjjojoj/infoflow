@@ -28,7 +28,7 @@ export default function InsightsPage() {
     async function fetchData() {
       try {
         const [articlesRes, interestsRes] = await Promise.all([
-          getArticles({ limit: 500 }),
+          getArticles({ limit: 500, skip: 0 }),
           getInterests(),
         ]);
         setAllArticles(articlesRes.data.items ?? []);
@@ -123,9 +123,8 @@ export default function InsightsPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {paged.map((article) => {
           const color = sourceTypeColors[article.source_type || ''] || '#6366f1';
-          const category = article.source_type === 'rss'
-            ? formatSourceName(article.source_name)
-            : formatSourceType(article.source_name || article.source_type);
+          const category = article.fetch_method
+            || (article.source_type === 'rss' ? '网页采集' : formatSourceType(article.source_name || article.source_type));
           return (
             <div
               key={article.id}

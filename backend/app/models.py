@@ -44,6 +44,7 @@ class Article(Base):
     is_bookmarked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     relevance_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    fetch_method: Mapped[str | None] = mapped_column(String(64), nullable=True)
     community: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
 
     insights: Mapped[list["Insight"]] = relationship(

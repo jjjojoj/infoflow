@@ -230,6 +230,7 @@ class CrawlerService:
                     source_type=article_data.get("source_type", ""),
                     tags=article_data.get("tags", []),
                     content_hash=hash_value,
+                    fetch_method=article_data.get("fetch_method"),
                     is_read=False,
                     is_bookmarked=False,
                     relevance_score=relevance_score,
