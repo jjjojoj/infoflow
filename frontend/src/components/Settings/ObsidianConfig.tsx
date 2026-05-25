@@ -50,7 +50,11 @@ export default function ObsidianConfig() {
     try {
       const res = await triggerExport(exportMode);
       const data = res.data;
-      setExportMsg(`成功导出 ${data.exported_count} 篇${data.skipped_count ? `，跳过 ${data.skipped_count} 篇` : ''}`);
+      if (data.exported_count === 0 && data.skipped_count > 0) {
+        setExportMsg(`所有 ${data.skipped_count} 篇均已导出过，无需重复导出。切换到「全量导出」可强制重新导出。`);
+      } else {
+        setExportMsg(`成功导出 ${data.exported_count} 篇${data.skipped_count ? `，跳过 ${data.skipped_count} 篇（已存在）` : ''}`);
+      }
       const statusRes = await getObsidianStatus();
       setStatus(statusRes.data);
     } catch (err) {
@@ -150,20 +154,12 @@ export default function ObsidianConfig() {
               浏览...
             </button>
           </div>
-          {hostPath && (
-            <p className="text-xs text-[var(--color-text-muted)]">
-              在 Obsidian 中「打开库」时选择此路径
-            </p>
-          )}
-        </div>
-
-        {/* Docker 内路径（只读参考） */}
-        {status?.vault_path && (
-          <div className="rounded-lg bg-[var(--color-bg-elevated)] p-3">
-            <span className="text-xs text-[var(--color-text-muted)]">容器内路径: </span>
-            <code className="text-xs text-[var(--color-text-secondary)]">{status.vault_path}</code>
-          </div>
+        {hostPath && (
+          <p className="text-xs text-[var(--color-text-muted)]">
+            在 Obsidian 中「打开库」时选择此路径
+          </p>
         )}
+        </div>
       </div>
 
       {/* Vault status */}
