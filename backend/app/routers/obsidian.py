@@ -43,6 +43,7 @@ class SingleExportResponse(BaseModel):
 class VaultStatus(BaseModel):
     """Vault 状态"""
     vault_path: str
+    host_path: str = ""
     available: bool
     note_count: int
     inbox_count: int = 0

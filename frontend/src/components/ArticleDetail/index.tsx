@@ -6,6 +6,10 @@ import type { Article } from '../../types';
 import { formatSourceName } from '../../utils/sourceDisplay';
 import MarkdownRenderer from '../common/MarkdownRenderer';
 
+function safeHostname(url: string) {
+  try { return new URL(url).hostname; } catch { return url; }
+}
+
 export default function ArticleDetail() {
   const { id } = useParams<{ id: string }>();
   const [article, setArticle] = useState<Article | null>(null);
@@ -138,7 +142,7 @@ export default function ArticleDetail() {
                   阅读原文
                 </div>
                 <div className="text-xs text-[var(--color-text-muted)]">
-                  {formatSourceName(article.source_name)} · {new URL(article.url).hostname}
+                  {formatSourceName(article.source_name)} · {safeHostname(article.url)}
                 </div>
               </div>
             </div>

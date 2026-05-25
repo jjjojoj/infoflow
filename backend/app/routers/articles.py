@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
@@ -89,7 +89,7 @@ async def list_articles(
         )
     if tag:
         # JSON array contains - SQLite compatible approach
-        stmt = stmt.where(Article.tags.contains(tag))
+        stmt = stmt.where(text("EXISTS (SELECT 1 FROM json_each(articles.tags) WHERE json_each.value = :tag)")).params(tag=tag)
 
     # Count total before pagination
     count_stmt = select(func.count()).select_from(stmt.subquery())

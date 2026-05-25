@@ -67,14 +67,14 @@ class OllamaLLM(BaseLLM):
                 )
                 return resp
         except httpx.HTTPStatusError as e:
-            logger.error("Ollama API HTTP 错误: %s - %s", e.response.status_code, e.response.text[:200])
-            return LLMResponse(content="", model=self.model, usage={})
+            logger.error("Ollama API HTTP error: %s - %s", e.response.status_code, e.response.text[:200])
+            raise RuntimeError(f"Ollama HTTP {e.response.status_code}") from e
         except httpx.ConnectError:
-            logger.error("无法连接 Ollama 服务 (%s)，请确认 Ollama 已启动", self.base_url)
-            return LLMResponse(content="", model=self.model, usage={})
+            logger.error("Cannot connect to Ollama at %s", self.base_url)
+            raise RuntimeError(f"Ollama connection refused at {self.base_url}") from None
         except Exception as e:
-            logger.error("Ollama API 调用失败: %s", e)
-            return LLMResponse(content="", model=self.model, usage={})
+            logger.exception("Ollama API call failed")
+            raise RuntimeError(f"Ollama API request failed: {e}") from e
 
     async def summarize(self, text: str, max_length: int = 200) -> str:
         """生成文本摘要。"""

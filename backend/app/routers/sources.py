@@ -1,28 +1,50 @@
 """Sources router - CRUD over RSS / crawler data sources."""
 from __future__ import annotations
 
+import ipaddress
+import logging
+import socket
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import select
+from pydantic import BaseModel, AnyHttpUrl, field_validator
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
 from ..models import Source
-from ..services.crawler import crawler_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 
 
-# --- Pydantic schemas ---
-
 class SourceCreate(BaseModel):
-    """Payload for creating a new source."""
     name: str
     url: str
-    source_type: str = "rss"  # rss | crawler
+    source_type: str = "rss"
+
+    @field_validator("url")
+    @classmethod
+    def block_private_hosts(cls, v: str) -> str:
+        """Prevent SSRF: reject URLs pointing to private/internal networks."""
+        try:
+            parsed = urlparse(v)
+            host = parsed.hostname
+            if not host:
+                raise ValueError("Invalid URL: no hostname")
+            # Resolve hostname to check IP
+            for addr in socket.getaddrinfo(host, None):
+                ip = ipaddress.ip_address(addr[4][0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local:
+                    raise ValueError("Private/internal network URLs are not allowed")
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Cannot resolve URL host: {e}") from e
+        return v
     enabled: bool = True
     fetch_interval: int = 30
     config: dict[str, Any] | None = None
@@ -81,7 +103,11 @@ async def create_source(
         config=payload.config or {},
     )
     session.add(source)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Source name or URL already exists")
     await session.refresh(source)
     return SourceResponse.model_validate(source).model_dump()
 

@@ -33,7 +33,7 @@ export default function SourceManager() {
   const fetchSources = async () => {
     try {
       const res = await getSources();
-      const data = Array.isArray(res.data) ? res.data : ((res.data as any)?.items ?? []);
+      const data = res.data.items ?? [];
       setSources(data);
     } catch (err) {
       console.error('Failed to fetch sources:', err);
@@ -95,7 +95,9 @@ export default function SourceManager() {
         const data = fetchRes.data as any;
         setTestBeforeAdd({ sourceId, success: true, message: `验证成功！抓取到 ${data.new_articles ?? 0} 篇新文章`, articlesFound: data.new_articles });
       } catch (fetchErr: any) {
-        setTestBeforeAdd({ sourceId, success: false, message: `源已添加但抓取失败: ${fetchErr?.response?.data?.detail || fetchErr?.message || ''}` });
+        // Fetch failed — remove the bad source
+        try { await deleteSource(sourceId); } catch {}
+        setTestBeforeAdd({ sourceId: 0, success: false, message: `验证失败，未添加信息源: ${fetchErr?.response?.data?.detail || fetchErr?.message || ''}` });
       }
       await fetchSources();
     } catch (err: any) {

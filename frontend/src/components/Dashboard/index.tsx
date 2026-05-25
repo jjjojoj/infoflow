@@ -55,7 +55,7 @@ export default function Dashboard() {
         ]);
         const items = articlesRes.data.items ?? [];
         const total = articlesRes.data.total ?? 0;
-        const sources = Array.isArray(sourcesRes.data) ? sourcesRes.data : ((sourcesRes.data as any)?.items ?? []);
+        const sources = sourcesRes.data.items ?? [];
         setArticles(items);
 
         // Derive stats from real data

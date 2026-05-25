@@ -119,9 +119,13 @@ export interface CreateInterestData {
 }
 
 export interface ObsidianStatus {
-  connected: boolean;
-  file_count: number;
-  last_export?: string | null;
+  vault_path: string;
+  host_path: string;
+  available: boolean;
+  note_count: number;
+  inbox_count: number;
+  areas: Record<string, number>;
+  last_updated: string | null;
 }
 
 export interface FetchHistory {

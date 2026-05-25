@@ -7,28 +7,65 @@ from datetime import datetime
 from typing import Any
 
 
-# Predefined keywords for filtering relevant content
-KEYWORDS = [
-    # 核心技术
+# Tier-1 keywords: strong signal, any ONE match = relevant
+CORE_KEYWORDS = [
+    # OCR / 文档AI
     "OCR", "文字识别", "optical character recognition", "document AI",
     "text recognition", "document understanding",
-    # 信创/国产化
-    "昇腾", "鲲鹏", "信创", "CANN", "MindSpore", "国产化",
-    "ascend", "huawei ai", "npu",
-    # AI框架与部署
-    "PaddleOCR", "paddleocr", "模型部署", "inference", "onnx",
-    "tensorrt", "量化", "quantiz", "蒸馏", "distill",
-    # 深度学习
-    "深度学习", "deep learning", "transformer", "大模型", "LLM",
-    "多模态", "multimodal", "计算机视觉", "computer vision",
-    "目标检测", "object detection", "图像分割", "segmentation",
-    # 工具与框架
-    "PyTorch", "pytorch", "Qwen", "DeepSeek", "Yi",
-    "Stable Diffusion", "diffusion", "GAN",
-    # AI 应用
-    "RAG", "agent", "fine-tun", "微调", "训练", "train",
-    "embedding", "向量数据库", "vector database",
+    # 信创 / 昇腾 / NPU
+    "昇腾", "鲲鹏", "信创", "CANN", "MindSpore", "国产化", "国产芯片",
+    "ascend", "npu", "huawei ai",
+    # OCR 具体工具
+    "PaddleOCR", "paddleocr",
+    # 模型部署 / 推理优化
+    "模型部署", "onnx", "tensorrt", "模型量化",
+    "inference optimization", "edge inference",
 ]
+
+# Tier-2 keywords: weak signal alone, need >=2 different matches OR paired with tier-1
+BROAD_KEYWORDS = [
+    # 大模型
+    "DeepSeek", "Qwen", "大模型", "LLM",
+    # CV
+    "计算机视觉", "computer vision", "目标检测", "object detection",
+    "图像分割", "segmentation", "多模态", "multimodal",
+    # 通用AI / 工程化
+    "PyTorch", "pytorch", "transformer", "量化", "quantiz",
+    "蒸馏", "distill", "RAG", "agent", "微调", "fine-tun",
+    "向量数据库", "vector database", "embedding",
+    # 部署/推理/加速相关
+    "ONNX", "onnx", "加速", "accelerat", "推理", "inference",
+    "训练", "training", "文档解析", "document pars",
+    "硬件加速", "hardware", "FSDP", "分布式",
+]
+
+# Combined list (for backward compat)
+KEYWORDS = CORE_KEYWORDS + BROAD_KEYWORDS
+
+# Interest category → representative keywords (for auto-tagging articles)
+# Used by the frontend "My Insights" page to group articles by interest tabs.
+INTEREST_CATEGORIES: dict[str, list[str]] = {
+    "OCR技术": ["OCR", "ocr", "文字识别", "document AI", "PaddleOCR", "paddleocr",
+                "文档解析", "document understanding", "text recognition"],
+    "昇腾/NPU": ["昇腾", "ascend", "鲲鹏", "CANN", "MindSpore", "NPU", "npu",
+                 "信创", "国产化", "华为"],
+    "模型部署": ["部署", "deploy", "onnx", "tensorrt", "推理", "inference",
+                "量化", "quantiz", "加速", "accelerat", "edge inference"],
+    "大模型": ["DeepSeek", "deepseek", "Qwen", "qwen", "LLM", "大模型",
+              "transformer", "微调", "fine-tun", "RAG"],
+    "工程化": ["PyTorch", "pytorch", "训练", "training", "FSDP", "分布式",
+             "蒸馏", "distill", "embedding", "agent"],
+}
+
+
+def match_interest_tags(title: str, content: str) -> list[str]:
+    """Return interest category labels that match the given article text."""
+    text = f"{title} {content}".lower()
+    matched = []
+    for category, keywords in INTEREST_CATEGORIES.items():
+        if any(kw.lower() in text for kw in keywords):
+            matched.append(category)
+    return matched
 
 
 @dataclass

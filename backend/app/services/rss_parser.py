@@ -144,8 +144,13 @@ class RSSParser:
             return None
 
         try:
-            loop = asyncio.get_event_loop()
-            articles = await loop.run_in_executor(None, self._scrapling_stealthy_sync, url)
+            # StealthyFetcher uses Playwright sync API internally, which conflicts
+            # with the running asyncio event loop. Run in a separate thread to isolate.
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                articles = await asyncio.get_event_loop().run_in_executor(
+                    pool, self._scrapling_stealthy_sync, url
+                )
             if articles is not None:
                 logger.info("[Layer 3 Scrapling深度] %s → %d 篇", url[:60], len(articles))
             return articles
@@ -156,7 +161,8 @@ class RSSParser:
     @staticmethod
     def _scrapling_stealthy_sync(url: str) -> list[dict[str, Any]] | None:
         from scrapling import StealthyFetcher as _StealthyFetcher
-        resp = _StealthyFetcher.fetch(url, headless=True)
+        sf = _StealthyFetcher()
+        resp = sf.fetch(url, headless=True)
         if resp.status != 200 or not resp.body:
             return None
         body: str = resp.body

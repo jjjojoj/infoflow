@@ -21,7 +21,7 @@ export default function InterestConfig() {
     async function load() {
       try {
         const res = await getInterests();
-        const data = Array.isArray(res.data) ? res.data : ((res.data as any)?.items ?? []);
+        const data = res.data.items ?? [];
         setInterests(data);
       } catch {
         setInterests([]);
